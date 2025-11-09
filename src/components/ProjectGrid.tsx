@@ -44,8 +44,15 @@ useEffect(() => {
 
 
   useEffect(() => {
+  if (user) {
     loadProjects();
-  }, []);
+  } else {
+    setProjects([]);     // optional, clears grid when signed out
+    setLoading(false);   // <-- prevents infinite Loading...
+  }
+}, [user]);
+
+
 
   const loadProjects = async () => {
     try {
