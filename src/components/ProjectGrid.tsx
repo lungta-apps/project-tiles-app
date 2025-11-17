@@ -220,6 +220,91 @@ useEffect(() => {
   }
 };
 
+  const handleRenameBoard = async (boardId: string, currentName: string) => {
+    if (!user) return;
+
+    const newName = prompt("Rename board:", currentName);
+    if (!newName || newName.trim() === currentName.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('boards')
+        .update({
+          name: newName.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', boardId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error renaming board:", error);
+        return;
+      }
+
+      // Update local state to match DB
+      setBoards(
+        boards.map((b) =>
+          b.id === boardId ? { ...b, name: data.name } : b
+        )
+      );
+    } catch (err) {
+      console.error("Unexpected error renaming board:", err);
+    }
+  };
+
+    const handleDeleteBoard = async (boardId: string) => {
+    if (!user) return;
+
+    const board = boards.find((b) => b.id === boardId);
+    if (!board) return;
+
+    if (boards.length <= 1) {
+      alert("You need at least one board. You can't delete the last one.");
+      return;
+    }
+
+    const confirmed = confirm(
+      `Delete board "${board.name}"? This will also delete its projects.`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Delete projects on this board (in case DB doesn't cascade)
+      const { error: projError } = await supabase
+        .from("projects")
+        .delete()
+        .eq("board_id", boardId);
+
+      if (projError) throw projError;
+
+      // Delete the board itself
+      const { error: boardError } = await supabase
+        .from("boards")
+        .delete()
+        .eq("id", boardId);
+
+      if (boardError) throw boardError;
+
+      const remainingBoards = boards.filter((b) => b.id !== boardId);
+      setBoards(remainingBoards);
+
+      // If we just deleted the active board, switch to another one
+      if (currentBoardId === boardId) {
+        if (remainingBoards.length > 0) {
+          const nextBoardId = remainingBoards[0].id;
+          setCurrentBoardId(nextBoardId);
+          await loadProjects(nextBoardId);
+        } else {
+          setCurrentBoardId(null);
+          setProjects([]);
+        }
+      }
+    } catch (err) {
+      console.error("Error deleting board:", err);
+    }
+  };
+
   const gridItems = Array.from({ length: 9 }, (_, index) => {
     const project = projects.find((p) => p.position === index);
     return { position: index, project };
@@ -246,10 +331,29 @@ useEffect(() => {
         <button
           key={board.id}
           onClick={() => setCurrentBoardId(board.id)}
+          onDoubleClick={() => handleRenameBoard(board.id, board.name)}
+          onMouseDown={(e) => {
+            // Start timer for long-press
+            const timer = setTimeout(() => {
+              handleDeleteBoard(board.id); // will confirm()
+            }, 700); // duration of long press
+            (e.target as HTMLElement).dataset.longPressTimer = String(timer);
+          }}
+          onMouseUp={(e) => {
+            // Cancel long-press if mouse is released early
+            const timer = (e.target as HTMLElement).dataset.longPressTimer;
+            if (timer) clearTimeout(Number(timer));
+          }}
+          onMouseLeave={(e) => {
+            // Cancel if mouse leaves the button
+            const timer = (e.target as HTMLElement).dataset.longPressTimer;
+            if (timer) clearTimeout(Number(timer));
+          }}
+
           className={[
             "px-3 py-1 rounded-full text-sm border",
             currentBoardId === board.id
-              ? "bg-blue-600 text-white border-blue-500"
+              ? "bg-zinc-900 text-white border-4 border-[#00C7BE]"
               : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800"
           ].join(" ")}
         >
