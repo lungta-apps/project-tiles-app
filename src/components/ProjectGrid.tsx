@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
-import { supabase } from '../lib/supabase';
+import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
 import SignInModal from "@/components/SignInModal";
+
 
 async function tempSignIn() {
   console.log('Temp Sign In starting');
@@ -24,8 +25,20 @@ async function tempSignIn() {
   window.location.reload();
 }
 
+interface ProjectGridProps {
+  boards: Board[];
+  currentBoardId: string | null;
+  setBoards: (boards: Board[]) => void;
+  setCurrentBoardId: (id: string | null) => void;
+}
 
-export default function ProjectGrid() {
+
+export default function ProjectGrid({
+  boards,
+  currentBoardId,
+  setBoards,
+  setCurrentBoardId,
+}: ProjectGridProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -42,23 +55,76 @@ useEffect(() => {
   return () => sub.subscription.unsubscribe();
 }, []);
 
-
   useEffect(() => {
-  if (user) {
-    loadProjects();
-  } else {
-    setProjects([]);     // optional, clears grid when signed out
-    setLoading(false);   // <-- prevents infinite Loading...
-  }
-}, [user]);
+    if (user) {
+      loadBoards();
+    } else {
+      setBoards([]);
+      setCurrentBoardId(null);
+    }
+  }, [user]);
+
+    useEffect(() => {
+    if (user && currentBoardId) {
+      loadProjects(currentBoardId);
+    } else {
+      setProjects([]);
+      setLoading(false);
+    }
+  }, [user, currentBoardId]);
 
 
+  const loadBoards = async () => {
+    if (!user) return;
 
-  const loadProjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('boards')
+        .select('*')
+        .order('position', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setBoards(data);
+        if (!currentBoardId) {
+          setCurrentBoardId(data[0].id);
+        }
+            } else {
+        // No boards yet for this user – create a default "Main" board
+        const { data: created, error: insertError } = await supabase
+          .from('boards')
+          .insert([{
+            user_id: user.id,
+            name: 'Main',
+            position: 0,
+          }])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        setBoards([created]);
+        setCurrentBoardId(created.id);
+      }
+
+    } catch (err) {
+      console.error('Error loading boards:', err);
+    }
+  };
+
+
+    const loadProjects = async (boardId: string | null) => {
+    if (!boardId) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
+        .eq('board_id', boardId)
         .order('position', { ascending: true });
 
       if (error) throw error;
@@ -70,6 +136,7 @@ useEffect(() => {
     }
   };
 
+
   const handleAddProject = async (name: string, color: string) => {
   try {
     const targetPosition = pendingPosition ?? projects.length;
@@ -78,13 +145,24 @@ useEffect(() => {
       return;
     }
 
+        if (!currentBoardId) {
+      alert('No board selected');
+      return;
+    }
+
     const { error } = await supabase
       .from('projects')
-      .insert([{ name, color, position: targetPosition }]);
+      .insert([{
+        name,
+        color,
+        position: targetPosition,
+        board_id: currentBoardId,
+      }]);
+
 
     if (error) throw error;
 
-    await loadProjects();
+    await loadProjects(currentBoardId);
     setIsModalOpen(false);
     setPendingPosition(null);   // reset
   } catch (error) {
@@ -116,7 +194,7 @@ useEffect(() => {
 
     if (error) throw error;
 
-    await loadProjects();
+    await loadProjects(currentBoardId);
     setIsModalOpen(false);
     setEditingProject(null);
   } catch (err) {
@@ -162,6 +240,60 @@ useEffect(() => {
   <AuthPanel />
 </div>
 			
+    {/* Board tabs */}
+    <div className="mb-4 flex gap-2">
+      {boards.map((board) => (
+        <button
+          key={board.id}
+          onClick={() => setCurrentBoardId(board.id)}
+          className={[
+            "px-3 py-1 rounded-full text-sm border",
+            currentBoardId === board.id
+              ? "bg-blue-600 text-white border-blue-500"
+              : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800"
+          ].join(" ")}
+        >
+          {board.name}
+        </button>
+      ))}
+      <button
+    onClick={async () => {
+      if (!user) return;
+
+      const newName = prompt("Board name:");
+      if (!newName) return;
+
+      const { data, error } = await supabase
+        .from('boards')
+        .insert([{
+          user_id: user.id,
+          name: newName,
+          position: boards.length,
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating board:", error);
+        return;
+      }
+
+      // Update state
+      setBoards([...boards, data]);
+      setCurrentBoardId(data.id);
+    }}
+    className="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700"
+  >
+    +
+  </button>
+
+      {boards.length === 0 && (
+        <span className="text-zinc-500 text-sm">
+          No boards yet
+        </span>
+      )}
+    </div>
+
     <div className="grid grid-cols-3 gap-6 aspect-square" role="grid" aria-label="Project grid">
         {gridItems.map(({ position, project }) => (
           <div
