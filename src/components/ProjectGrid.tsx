@@ -101,6 +101,34 @@ useEffect(() => {
   setIsModalOpen(true);
 };
 
+  const handleToggleCompleted = async (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const currentCompleted = (project as any).completed ?? false;
+    const nextCompleted = !currentCompleted;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          completed: nextCompleted,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', projectId);
+
+      if (error) throw error;
+
+      // Update local state so UI reflects the change immediately
+      setProjects(
+        projects.map((p) =>
+          p.id === projectId ? { ...p, completed: nextCompleted } : p
+        )
+      );
+    } catch (err) {
+      console.error('Error toggling completed:', err);
+    }
+  };
 
   const handleUpdateProject = async (name: string, color: string) => {
   if (!editingProject) return;
@@ -172,10 +200,11 @@ useEffect(() => {
           >
             {project ? (
   <ProjectTile
-    project={project}
-    onDelete={handleDeleteProject}
-    onChangeColor={handleChangeColor}
-  />
+  project={project}
+  onDelete={handleDeleteProject}
+  onChangeColor={handleChangeColor}
+  onToggleCompleted={handleToggleCompleted}
+/>
 ) : (
   <button
     onClick={() => {
