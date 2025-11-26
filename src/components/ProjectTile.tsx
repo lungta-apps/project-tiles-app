@@ -5,9 +5,10 @@ interface ProjectTileProps {
   project: Project;
   onDelete: (id: string) => void;
   onChangeColor: (id: string) => void;
+  onShowTasks: (project: Project) => void; // New prop for showing tasks
 }
 
-export default function ProjectTile({ project, onDelete, onChangeColor }: ProjectTileProps) {
+export default function ProjectTile({ project, onDelete, onChangeColor, onShowTasks }: ProjectTileProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -62,10 +63,14 @@ export default function ProjectTile({ project, onDelete, onChangeColor }: Projec
   	onDelete(project.id);
 };
 
-
   const handleChangeColor = () => {
     setShowMenu(false);
     onChangeColor(project.id);
+  };
+
+  const handleShowTasks = () => {
+    setShowMenu(false);
+    onShowTasks(project);
   };
 
   return (
@@ -86,6 +91,7 @@ export default function ProjectTile({ project, onDelete, onChangeColor }: Projec
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDoubleClick={handleShowTasks} // Double-click to show tasks
       role="button"
       tabIndex={0}
       aria-label={`Project: ${project.name}. Long press to show options.`}
@@ -117,6 +123,14 @@ export default function ProjectTile({ project, onDelete, onChangeColor }: Projec
             Change Color
           </button>
           <button
+            onClick={handleShowTasks} // Add Tasks option in long-press menu
+            className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+            role="menuitem"
+            aria-label="Add tasks to project"
+          >
+            Add Tasks
+          </button>
+          <button
             onClick={handleDelete}
             className="w-full px-6 py-3 text-left text-red-400 hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
             role="menuitem"
@@ -129,3 +143,4 @@ export default function ProjectTile({ project, onDelete, onChangeColor }: Projec
     </div>
   );
 }
+

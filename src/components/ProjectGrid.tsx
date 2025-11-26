@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
-import { supabase } from '../lib/supabase';
+import TaskModal from './TaskModal'; // Import TaskModal
+import { supabase, Project } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
 import SignInModal from "@/components/SignInModal";
 
@@ -33,6 +34,7 @@ export default function ProjectGrid() {
 	const [user, setUser] = useState<any>(null);
 	const [showSignInModal, setShowSignInModal] = useState(false);
 	const [pendingPosition, setPendingPosition] = useState<number | null>(null);
+  const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null); // New state for TaskModal
 
 useEffect(() => {
   supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
@@ -142,6 +144,10 @@ useEffect(() => {
   }
 };
 
+  const handleShowTasks = (project: Project) => {
+    setSelectedProjectForTasks(project);
+  };
+
   const gridItems = Array.from({ length: 9 }, (_, index) => {
     const project = projects.find((p) => p.position === index);
     return { position: index, project };
@@ -175,6 +181,7 @@ useEffect(() => {
     project={project}
     onDelete={handleDeleteProject}
     onChangeColor={handleChangeColor}
+    onShowTasks={handleShowTasks} // Pass the new prop
   />
 ) : (
   <button
@@ -212,8 +219,14 @@ useEffect(() => {
   initialName={editingProject?.name}
   title={editingProject ? 'Edit Project' : 'Add New Project'}
 />
-			<SignInModal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)} />
-
-    </div>
-  );
-}
+						<SignInModal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)} />
+			
+			      {selectedProjectForTasks && ( // Conditionally render TaskModal
+			        <TaskModal
+			          project={selectedProjectForTasks}
+			          onClose={() => setSelectedProjectForTasks(null)}
+			        />
+			      )}
+			    </div>
+			  );
+			}
