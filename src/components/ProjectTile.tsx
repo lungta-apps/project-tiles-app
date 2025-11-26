@@ -1,14 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { Project } from '../lib/supabase';
 
+// Combines props for both features
 interface ProjectTileProps {
   project: Project;
   onDelete: (id: string) => void;
   onChangeColor: (id: string) => void;
-  onShowTasks: (project: Project) => void; // New prop for showing tasks
+  onShowTasks: (project: Project) => void;
+  onToggleCompleted: (id: string) => void;
 }
 
-export default function ProjectTile({ project, onDelete, onChangeColor, onShowTasks }: ProjectTileProps) {
+export default function ProjectTile({
+  project,
+  onDelete,
+  onChangeColor,
+  onShowTasks,
+  onToggleCompleted,
+}: ProjectTileProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -47,30 +55,35 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onShowTa
         setShowMenu(false);
       }
     };
-
     if (showMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showMenu]);
 
   const handleDelete = () => {
-  	console.log('DELETE clicked', project.id);
-  	setShowMenu(false);
-  	onDelete(project.id);
-};
+    console.log('DELETE clicked', project.id);
+    setShowMenu(false);
+    onDelete(project.id);
+  };
 
   const handleChangeColor = () => {
     setShowMenu(false);
     onChangeColor(project.id);
   };
 
+  // Our handler from the feature branch
   const handleShowTasks = () => {
     setShowMenu(false);
     onShowTasks(project);
+  };
+
+  // The handler from the main branch
+  const handleToggleCompleted = () => {
+    setShowMenu(false);
+    onToggleCompleted(project.id);
   };
 
   return (
@@ -78,14 +91,14 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onShowTa
       ref={tileRef}
       className="relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none"
       style={{
-  			borderWidth: '2px',
-  			borderColor: project.color,
- 			 boxShadow: `
-   			 0 0 8px ${project.color}80,
-   			 0 0 16px ${project.color}60,
-				 0 0 24px ${project.color}40
-  			`,
-			}}
+        borderWidth: '2px',
+        borderColor: project.color,
+        boxShadow: `
+          0 0 8px ${project.color}80,
+          0 0 16px ${project.color}60,
+          0 0 24px ${project.color}40
+        `,
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
@@ -123,7 +136,15 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onShowTa
             Change Color
           </button>
           <button
-            onClick={handleShowTasks} // Add Tasks option in long-press menu
+            onClick={handleToggleCompleted}
+            className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+            role="menuitem"
+            aria-label="Mark project as completed"
+          >
+            Mark Completed
+          </button>
+          <button
+            onClick={handleShowTasks}
             className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
             role="menuitem"
             aria-label="Add tasks to project"
@@ -143,4 +164,3 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onShowTa
     </div>
   );
 }
-
