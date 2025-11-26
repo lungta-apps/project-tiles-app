@@ -1,14 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { Project } from '../lib/supabase';
 
+// Combines props for both features
 interface ProjectTileProps {
   project: Project;
   onDelete: (id: string) => void;
   onChangeColor: (id: string) => void;
+  onShowTasks: (project: Project) => void;
   onToggleCompleted: (id: string) => void;
 }
 
-export default function ProjectTile({ project, onDelete, onChangeColor, onToggleCompleted }: ProjectTileProps) {
+export default function ProjectTile({
+  project,
+  onDelete,
+  onChangeColor,
+  onShowTasks,
+  onToggleCompleted,
+}: ProjectTileProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -47,25 +55,18 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onToggle
         setShowMenu(false);
       }
     };
-
     if (showMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showMenu]);
 
   const handleDelete = () => {
-  	console.log('DELETE clicked', project.id);
-  	setShowMenu(false);
-  	onDelete(project.id);
-};
-
-  const handleToggleCompleted = () => {
+    console.log('DELETE clicked', project.id);
     setShowMenu(false);
-    onToggleCompleted(project.id);
+    onDelete(project.id);
   };
 
   const handleChangeColor = () => {
@@ -73,27 +74,37 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onToggle
     onChangeColor(project.id);
   };
 
+  // Our handler from the feature branch
+  const handleShowTasks = () => {
+    setShowMenu(false);
+    onShowTasks(project);
+  };
+
+  // The handler from the main branch
+  const handleToggleCompleted = () => {
+    setShowMenu(false);
+    onToggleCompleted(project.id);
+  };
+
   return (
     <div
       ref={tileRef}
-        className={[
-    "relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none",
-    project.completed ? "opacity-50" : ""
-  ].join(" ")}
+      className="relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none"
       style={{
-  			borderWidth: '2px',
-  			borderColor: project.color,
- 			 boxShadow: `
-   			 0 0 8px ${project.color}80,
-   			 0 0 16px ${project.color}60,
-				 0 0 24px ${project.color}40
-  			`,
-			}}
+        borderWidth: '2px',
+        borderColor: project.color,
+        boxShadow: `
+          0 0 8px ${project.color}80,
+          0 0 16px ${project.color}60,
+          0 0 24px ${project.color}40
+        `,
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDoubleClick={handleShowTasks} // Double-click to show tasks
       role="button"
       tabIndex={0}
       aria-label={`Project: ${project.name}. Long press to show options.`}
@@ -105,23 +116,6 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onToggle
       }}
     >
       <h2 className="text-2xl font-bold text-white text-center px-4">{project.name}</h2>
-
-      {project.completed && (
-  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-    <svg 
-      className="w-[90%] h-[90%] opacity-40" 
-      viewBox="0 0 100 100"
-      stroke="rgb(120,120,120)"
-      strokeWidth="10"
-      strokeLinecap="round"
-    >
-      <line x1="10" y1="10" x2="90" y2="90" />
-      <line x1="90" y1="10" x2="10" y2="90" />
-    </svg>
-  </div>
-)}
-
-
 
       {showMenu && (
         <div
@@ -141,23 +135,28 @@ export default function ProjectTile({ project, onDelete, onChangeColor, onToggle
           >
             Change Color
           </button>
-          
           <button
             onClick={handleToggleCompleted}
-            className="w-full px-6 py-3 text-left text-zinc-300 hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+            className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
             role="menuitem"
-            aria-label={project.completed ? "Mark project as not completed" : "Mark project as completed"}
+            aria-label="Mark project as completed"
           >
-            {project.completed ? "Mark Not Completed" : "Mark Completed"}
+            Mark Completed
           </button>
-
+          <button
+            onClick={handleShowTasks}
+            className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+            role="menuitem"
+            aria-label="Add tasks to project"
+          >
+            Add Tasks
+          </button>
           <button
             onClick={handleDelete}
             className="w-full px-6 py-3 text-left text-red-400 hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
             role="menuitem"
             aria-label="Delete project"
           >
-            
             Delete
           </button>
         </div>
