@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
-import TaskModal from './TaskModal'; // Our import
-import { supabase, type Project, type Board } from '../lib/supabase'; // Combined imports
+import TaskModal from './TaskModal';
+import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
 import SignInModal from "@/components/SignInModal";
 
-// Props from the 'main' branch for the new Boards feature
 interface ProjectGridProps {
   boards: Board[];
   currentBoardId: string | null;
@@ -28,7 +27,7 @@ export default function ProjectGrid({
   const [user, setUser] = useState<any>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<number | null>(null);
-  const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null); // Our state for TaskModal
+  const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
@@ -38,7 +37,6 @@ export default function ProjectGrid({
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // All of the following logic for loading boards and projects is from the 'main' branch
   useEffect(() => {
     if (user) {
       loadBoards();
@@ -108,7 +106,6 @@ export default function ProjectGrid({
     }
   };
 
-  // Merged handleAddProject to include board_id
   const handleAddProject = async (name: string, color: string) => {
     try {
       const targetPosition = pendingPosition ?? projects.length;
@@ -140,7 +137,6 @@ export default function ProjectGrid({
     setIsModalOpen(true);
   };
 
-  // Handler from 'main' branch
   const handleToggleCompleted = async (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
@@ -178,18 +174,16 @@ export default function ProjectGrid({
     try {
       const { error } = await supabase.from('projects').delete().eq('id', projectId);
       if (error) throw error;
-      await loadProjects(currentBoardId); // Reload projects for the current board
+      await loadProjects(currentBoardId);
     } catch (err) {
       console.error('Delete failed:', err);
     }
   };
 
-  // Our handler from the feature branch
   const handleShowTasks = (project: Project) => {
     setSelectedProjectForTasks(project);
   };
 
-  // All board handlers from the 'main' branch
   const handleRenameBoard = async (boardId: string, currentName: string) => {
     if (!user) return;
     const newName = prompt("Rename board:", currentName);
@@ -243,83 +237,89 @@ export default function ProjectGrid({
   }
 
   return (
-    <>
-      <div className="mb-4 flex gap-2">
-        {boards.map((board) => (
-          <button
-            key={board.id}
-            onClick={() => setCurrentBoardId(board.id)}
-            onDoubleClick={() => handleRenameBoard(board.id, board.name)}
-            onMouseDown={(e) => {
-              const timer = setTimeout(() => handleDeleteBoard(board.id), 700);
-              (e.target as HTMLElement).dataset.longPressTimer = String(timer);
-            }}
-            onMouseUp={(e) => {
-              const timer = (e.target as HTMLElement).dataset.longPressTimer;
-              if (timer) clearTimeout(Number(timer));
-            }}
-            onMouseLeave={(e) => {
-              const timer = (e.target as HTMLElement).dataset.longPressTimer;
-              if (timer) clearTimeout(Number(timer));
-            }}
-            className={[
-              "px-3 py-1 rounded-full text-sm border",
-              currentBoardId === board.id
-                ? "bg-zinc-900 text-white border-4 border-[#00C7BE]"
-                : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800"
-            ].join(" ")}
-          >
-            {board.name}
-          </button>
-        ))}
-        <button
-          onClick={async () => {
-            if (!user) return;
-            const newName = prompt("Board name:");
-            if (!newName) return;
-            const { data, error } = await supabase
-              .from('boards')
-              .insert([{ user_id: user.id, name: newName, position: boards.length }])
-              .select()
-              .single();
-            if (error) return console.error("Error creating board:", error);
-            setBoards([...boards, data]);
-            setCurrentBoardId(data.id);
-          }}
-          className="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700"
-        >
-          +
-        </button>
-      </div>
+    <div className="min-h-screen bg-black p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6">
+          <AuthPanel />
+        </div>
 
-      <div className="grid grid-cols-3 gap-6 aspect-square" role="grid" aria-label="Project grid">
-        {gridItems.map(({ position, project }) => (
-          <div key={position} className="border border-zinc-800 rounded-lg p-4" style={{ minHeight: '200px' }} role="gridcell">
-            {project ? (
-              <ProjectTile
-                project={project}
-                onDelete={handleDeleteProject}
-                onChangeColor={handleChangeColor}
-                onToggleCompleted={handleToggleCompleted} // Prop from main
-                onShowTasks={handleShowTasks}             // Our prop
-              />
-            ) : (
-              <button
-                onClick={() => {
-                  if (!user) return setShowSignInModal(true);
-                  setEditingProject(null);
-                  setPendingPosition(position);
-                  setIsModalOpen(true);
-                }}
-                className="w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-label="Add new project"
-              >
-                <Plus size={48} className="text-zinc-600 mb-2" />
-                <span className="text-zinc-500 text-sm">Add Project</span>
-              </button>
-            )}
-          </div>
-        ))}
+        <div className="mb-4 flex gap-2">
+          {boards.map((board) => (
+            <button
+              key={board.id}
+              onClick={() => setCurrentBoardId(board.id)}
+              onDoubleClick={() => handleRenameBoard(board.id, board.name)}
+              onMouseDown={(e) => {
+                const timer = setTimeout(() => handleDeleteBoard(board.id), 700);
+                (e.target as HTMLElement).dataset.longPressTimer = String(timer);
+              }}
+              onMouseUp={(e) => {
+                const timer = (e.target as HTMLElement).dataset.longPressTimer;
+                if (timer) clearTimeout(Number(timer));
+              }}
+              onMouseLeave={(e) => {
+                const timer = (e.target as HTMLElement).dataset.longPressTimer;
+                if (timer) clearTimeout(Number(timer));
+              }}
+              className={[
+                "px-3 py-1 rounded-full text-sm border",
+                currentBoardId === board.id
+                  ? "bg-zinc-900 text-white border-4 border-[#00C7BE]"
+                  : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800"
+              ].join(" ")}
+            >
+              {board.name}
+            </button>
+          ))}
+          <button
+            onClick={async () => {
+              if (!user) return;
+              const newName = prompt("Board name:");
+              if (!newName) return;
+              const { data, error } = await supabase
+                .from('boards')
+                .insert([{ user_id: user.id, name: newName, position: boards.length }])
+                .select()
+                .single();
+              if (error) return console.error("Error creating board:", error);
+              setBoards([...boards, data]);
+              setCurrentBoardId(data.id);
+            }}
+            className="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6 aspect-square" role="grid" aria-label="Project grid">
+          {gridItems.map(({ position, project }) => (
+            <div key={position} className="border border-zinc-800 rounded-lg p-4" style={{ minHeight: '200px' }} role="gridcell">
+              {project ? (
+                <ProjectTile
+                  project={project}
+                  onDelete={handleDeleteProject}
+                  onChangeColor={handleChangeColor}
+                  onToggleCompleted={handleToggleCompleted}
+                  onShowTasks={handleShowTasks}
+                />
+              ) : (
+                <button
+                  onClick={() => {
+                    if (!user) return setShowSignInModal(true);
+                    setEditingProject(null);
+                    setPendingPosition(position);
+                    setIsModalOpen(true);
+                  }}
+                  className="w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Add new project"
+                >
+                  <Plus size={48} className="text-zinc-600 mb-2" />
+                  <span className="text-zinc-500 text-sm">Add Project</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <AddProjectModal
@@ -343,6 +343,6 @@ export default function ProjectGrid({
           onClose={() => setSelectedProjectForTasks(null)}
         />
       )}
-    </>
+    </div>
   );
 }
