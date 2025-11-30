@@ -7,7 +7,9 @@ interface TaskModalProps {
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
-  const [tasks, setTasks] = useState<string[]>(Array(5).fill('')); // State for 5 tasks
+  const [tasks, setTasks] = useState<{ description: string; is_completed: boolean }[]>(
+    Array(10).fill({ description: '', is_completed: false })
+  );
   const [existingTaskObjects, setExistingTaskObjects] = useState<Task[]>([]);
 
   useEffect(() => {
@@ -24,9 +26,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
       }
 
       setExistingTaskObjects(data || []);
-      const loadedTasks = Array(5).fill('');
+      const loadedTasks = Array(10).fill({ description: '', is_completed: false });
       data?.forEach((task, index) => {
-        if (index < 5) loadedTasks[index] = task.description;
+        if (index < 10) {
+          loadedTasks[index] = { description: task.description, is_completed: task.is_completed };
+        }
       });
       setTasks(loadedTasks);
     };
@@ -34,46 +38,69 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
     fetchTasks();
   }, [project.id]);
 
-  const handleTaskChange = (index: number, value: string) => {
+  const handleDescriptionChange = (index: number, value: string) => {
     const newTasks = [...tasks];
-    newTasks[index] = value;
+    newTasks[index] = { ...newTasks[index], description: value };
+    setTasks(newTasks);
+  };
+
+  const handleCompletionChange = (index: number, isCompleted: boolean) => {
+    const newTasks = [...tasks];
+    newTasks[index] = { ...newTasks[index], is_completed: isCompleted };
     setTasks(newTasks);
   };
 
   const handleSaveTasks = async () => {
-    const tasksToSave = tasks.map((description, index) => {
-      const existingTask = existingTaskObjects[index];
-      return {
-        id: existingTask?.id,
-        description: description.trim(),
-        project_id: project.id,
-      };
-    }).filter(task => task.description !== '' || task.id); // Only save non-empty new tasks or existing tasks
-
     try {
-      // Delete tasks that were cleared
-      const tasksToDelete = existingTaskObjects.filter(
-        (existingTask) => !tasksToSave.some((t) => t.id === existingTask.id) && tasks.every(d => d.trim() !== existingTask.description)
-      );
-      if (tasksToDelete.length > 0) {
-        await supabase.from('tasks').delete().in('id', tasksToDelete.map(t => t.id));
-      }
+      const tasksToInsert: Omit<Task, 'id' | 'created_at' | 'updated_at'>[] = [];
+      const tasksToUpdate: Omit<Task, 'created_at' | 'updated_at'>[] = [];
+      const idsToDelete: string[] = [];
 
+      for (let i = 0; i < 10; i++) {
+        const uiTask = tasks[i];
+        const originalTask = existingTaskObjects[i];
 
-      // Upsert (update or insert) remaining tasks
-      const newOrUpdatedTasks = tasksToSave.map(task => {
-        if (task.id) { // Existing task, might be updated
-          return { id: task.id, description: task.description, project_id: task.project_id };
-        } else if (task.description !== '') { // New task
-          return { description: task.description, project_id: task.project_id };
+        const description = uiTask.description.trim();
+        const hasText = description !== '';
+        const hadTaskBefore = originalTask !== undefined;
+
+        if (hasText && !hadTaskBefore) {
+          // Case 1: New task to be inserted
+          tasksToInsert.push({
+            project_id: project.id,
+            description: description,
+            is_completed: uiTask.is_completed,
+          });
+        } else if (hasText && hadTaskBefore) {
+          // Case 2: Existing task to be updated
+          tasksToUpdate.push({
+            id: originalTask.id,
+            project_id: project.id,
+            description: description,
+            is_completed: uiTask.is_completed,
+          });
+        } else if (!hasText && hadTaskBefore) {
+          // Case 3: Existing task to be deleted
+          idsToDelete.push(originalTask.id);
         }
-        return null;
-      }).filter(Boolean); // Filter out nulls
-
-      if (newOrUpdatedTasks.length > 0) {
-        const { error } = await supabase.from('tasks').upsert(newOrUpdatedTasks, { onConflict: 'id' });
-        if (error) throw error;
       }
+
+      // Perform DB operations
+      const promises = [];
+      if (idsToDelete.length > 0) {
+        promises.push(supabase.from('tasks').delete().in('id', idsToDelete));
+      }
+      if (tasksToInsert.length > 0) {
+        promises.push(supabase.from('tasks').upsert(tasksToInsert));
+      }
+      if (tasksToUpdate.length > 0) {
+        promises.push(supabase.from('tasks').upsert(tasksToUpdate));
+      }
+
+      const results = await Promise.all(promises);
+      results.forEach(result => {
+        if (result.error) throw result.error;
+      });
 
       onClose(); // Close modal after saving
     } catch (error) {
@@ -87,14 +114,21 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
         <h2 className="text-white text-xl mb-4">Tasks for {project.name}</h2>
         <div className="space-y-2">
           {tasks.map((task, i) => (
-            <input
-              key={i}
-              type="text"
-              className="w-full p-2 rounded bg-gray-600 text-white placeholder-gray-400"
-              placeholder={`Task ${i + 1}`}
-              value={task}
-              onChange={(e) => handleTaskChange(i, e.target.value)}
-            />
+            <div key={i} className="flex items-center">
+              <input
+                type="checkbox"
+                className="mr-2 h-5 w-5 rounded bg-gray-600 text-blue-500 focus:ring-blue-500"
+                checked={task.is_completed}
+                onChange={(e) => handleCompletionChange(i, e.target.checked)}
+              />
+              <input
+                type="text"
+                className={`w-full p-2 rounded bg-gray-600 text-white placeholder-gray-400 ${task.is_completed ? 'line-through' : ''}`}
+                placeholder={`Task ${i + 1}`}
+                value={task.description}
+                onChange={(e) => handleDescriptionChange(i, e.target.value)}
+              />
+            </div>
           ))}
         </div>
         <div className="mt-4 flex justify-end">

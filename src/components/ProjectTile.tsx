@@ -149,7 +149,7 @@ export default function ProjectTile({
             role="menuitem"
             aria-label="Add tasks to project"
           >
-            Add Tasks
+            Tasks
           </button>
           <button
             onClick={handleDelete}
