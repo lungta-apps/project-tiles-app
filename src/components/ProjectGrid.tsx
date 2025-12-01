@@ -92,13 +92,30 @@ export default function ProjectGrid({
     }
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
         .eq('board_id', boardId)
         .order('position', { ascending: true });
-      if (error) throw error;
-      setProjects(data || []);
+      if (projectsError) throw projectsError;
+
+      if (projectsData) {
+        const projectIds = projectsData.map((p) => p.id);
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('tasks')
+          .select('*')
+          .in('project_id', projectIds);
+
+        if (tasksError) throw tasksError;
+
+        const projectsWithTasks = projectsData.map((project) => ({
+          ...project,
+          tasks: tasksData.filter((task) => task.project_id === project.id),
+        }));
+        setProjects(projectsWithTasks);
+      } else {
+        setProjects([]);
+      }
     } catch (error) {
       console.error('Error loading projects:', error);
     } finally {
@@ -340,7 +357,10 @@ export default function ProjectGrid({
       {selectedProjectForTasks && (
         <TaskModal
           project={selectedProjectForTasks}
-          onClose={() => setSelectedProjectForTasks(null)}
+          onClose={() => {
+            setSelectedProjectForTasks(null);
+            loadProjects(currentBoardId);
+          }}
         />
       )}
     </div>

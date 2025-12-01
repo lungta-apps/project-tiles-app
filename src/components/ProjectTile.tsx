@@ -86,6 +86,8 @@ export default function ProjectTile({
     onToggleCompleted(project.id);
   };
 
+  const hasIncompleteTasks = project.tasks && project.tasks.some(task => !task.is_completed);
+
   return (
     <div
       ref={tileRef}
@@ -115,6 +117,16 @@ export default function ProjectTile({
         }
       }}
     >
+      {hasIncompleteTasks && (
+        <div 
+          className="absolute top-3 right-3 w-5 h-5 rounded-full"
+          style={{ 
+            backgroundColor: '#1ABC9C',
+            boxShadow: `0 0 8px #1ABC9C80, 0 0 16px #1ABC9C60, 0 0 24px #1ABC9C40`
+          }}
+          aria-label="This project has incomplete tasks"
+        ></div>
+      )}
       <h2 className="text-2xl font-bold text-white text-center px-4">{project.name}</h2>
 
       {showMenu && (
