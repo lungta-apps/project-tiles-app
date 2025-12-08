@@ -28,6 +28,8 @@ export default function ProjectGrid({
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<number | null>(null);
   const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
+  const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
+  const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
@@ -240,6 +242,44 @@ export default function ProjectGrid({
     }
   };
 
+  const handleReorderBoards = async (draggedId: string, targetId: string) => {
+    if (!user || draggedId === targetId) return;
+
+    const draggedIndex = boards.findIndex((b) => b.id === draggedId);
+    const targetIndex = boards.findIndex((b) => b.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Create new array with reordered boards
+    const reorderedBoards = [...boards];
+    const [draggedBoard] = reorderedBoards.splice(draggedIndex, 1);
+    reorderedBoards.splice(targetIndex, 0, draggedBoard);
+
+    // Update positions in the reordered array
+    const updatedBoards = reorderedBoards.map((board, index) => ({
+      ...board,
+      position: index,
+    }));
+
+    // Optimistically update UI
+    setBoards(updatedBoards);
+
+    // Update positions in database
+    try {
+      const updates = updatedBoards.map((board) =>
+        supabase
+          .from('boards')
+          .update({ position: board.position, updated_at: new Date().toISOString() })
+          .eq('id', board.id)
+      );
+      await Promise.all(updates);
+    } catch (err) {
+      console.error("Error reordering boards:", err);
+      // Reload boards to restore correct order
+      await loadBoards();
+    }
+  };
+
   const gridItems = Array.from({ length: 9 }, (_, index) => {
     const project = projects.find((p) => p.position === index);
     return { position: index, project };
@@ -264,6 +304,7 @@ export default function ProjectGrid({
           {boards.map((board) => (
             <button
               key={board.id}
+              draggable
               onClick={() => setCurrentBoardId(board.id)}
               onDoubleClick={() => handleRenameBoard(board.id, board.name)}
               onMouseDown={(e) => {
@@ -278,11 +319,40 @@ export default function ProjectGrid({
                 const timer = (e.target as HTMLElement).dataset.longPressTimer;
                 if (timer) clearTimeout(Number(timer));
               }}
+              onDragStart={(e) => {
+                // Cancel long-press timer when drag starts
+                const timer = (e.target as HTMLElement).dataset.longPressTimer;
+                if (timer) clearTimeout(Number(timer));
+                setDraggedBoardId(board.id);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDragOverBoardId(board.id);
+              }}
+              onDragLeave={() => {
+                setDragOverBoardId(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedBoardId) {
+                  handleReorderBoards(draggedBoardId, board.id);
+                }
+                setDraggedBoardId(null);
+                setDragOverBoardId(null);
+              }}
+              onDragEnd={() => {
+                setDraggedBoardId(null);
+                setDragOverBoardId(null);
+              }}
               className={[
-                "px-3 py-1 rounded-full text-sm border",
+                "px-3 py-1 rounded-full text-sm border transition-opacity",
                 currentBoardId === board.id
                   ? "bg-zinc-900 text-white border-4 border-[#00C7BE]"
-                  : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800"
+                  : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800",
+                draggedBoardId === board.id ? "opacity-50" : "",
+                dragOverBoardId === board.id ? "border-blue-500" : ""
               ].join(" ")}
             >
               {board.name}
