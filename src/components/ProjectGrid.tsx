@@ -30,6 +30,8 @@ export default function ProjectGrid({
   const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
+  const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
@@ -280,6 +282,49 @@ export default function ProjectGrid({
     }
   };
 
+  const handleReorderProjects = async (fromPosition: number, toPosition: number) => {
+    if (!user || !currentBoardId || fromPosition === toPosition) return;
+
+    // Create an array of 9 slots (the entire grid)
+    // Each slot either contains a project or is null (empty)
+    const slots = Array.from({ length: 9 }, (_, index) => {
+      const project = projects.find(p => p.position === index);
+      return project || null;
+    });
+
+    // Reorder the slots array - move the slot from fromPosition to toPosition
+    const [draggedSlot] = slots.splice(fromPosition, 1);
+    slots.splice(toPosition, 0, draggedSlot);
+
+    // Extract non-null projects and update their positions based on new indices
+    const updatedProjects = slots
+      .map((project, index) => {
+        if (project) {
+          return { ...project, position: index };
+        }
+        return null;
+      })
+      .filter((p): p is Project => p !== null);
+
+    // Optimistically update UI
+    setProjects(updatedProjects);
+
+    // Update positions in database for all affected projects
+    try {
+      const updates = updatedProjects.map((project) =>
+        supabase
+          .from('projects')
+          .update({ position: project.position, updated_at: new Date().toISOString() })
+          .eq('id', project.id)
+      );
+      await Promise.all(updates);
+    } catch (err) {
+      console.error("Error reordering projects:", err);
+      // Reload projects to restore correct order
+      await loadProjects(currentBoardId);
+    }
+  };
+
   const gridItems = Array.from({ length: 9 }, (_, index) => {
     const project = projects.find((p) => p.position === index);
     return { position: index, project };
@@ -380,7 +425,28 @@ export default function ProjectGrid({
 
         <div className="grid grid-cols-3 gap-6 aspect-square" role="grid" aria-label="Project grid">
           {gridItems.map(({ position, project }) => (
-            <div key={position} className="border border-zinc-800 rounded-lg p-4" style={{ minHeight: '200px' }} role="gridcell">
+            <div
+              key={position}
+              className="border border-zinc-800 rounded-lg p-4"
+              style={{ minHeight: '200px' }}
+              role="gridcell"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDragOverPosition(position);
+              }}
+              onDragLeave={() => {
+                setDragOverPosition(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedPosition !== null) {
+                  handleReorderProjects(draggedPosition, position);
+                }
+                setDraggedPosition(null);
+                setDragOverPosition(null);
+              }}
+            >
               {project ? (
                 <ProjectTile
                   project={project}
@@ -388,21 +454,41 @@ export default function ProjectGrid({
                   onChangeColor={handleChangeColor}
                   onToggleCompleted={handleToggleCompleted}
                   onShowTasks={handleShowTasks}
+                  isDragging={draggedPosition === position}
+                  isDragOver={dragOverPosition === position}
+                  onDragStart={() => setDraggedPosition(position)}
+                  onDragEnd={() => {
+                    setDraggedPosition(null);
+                    setDragOverPosition(null);
+                  }}
                 />
               ) : (
-                <button
-                  onClick={() => {
-                    if (!user) return setShowSignInModal(true);
-                    setEditingProject(null);
-                    setPendingPosition(position);
-                    setIsModalOpen(true);
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedPosition(position);
+                    e.dataTransfer.effectAllowed = 'move';
                   }}
-                  className="w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  aria-label="Add new project"
+                  onDragEnd={() => {
+                    setDraggedPosition(null);
+                    setDragOverPosition(null);
+                  }}
+                  className={`w-full h-full ${draggedPosition === position ? 'opacity-50' : ''}`}
                 >
-                  <Plus size={48} className="text-zinc-600 mb-2" />
-                  <span className="text-zinc-500 text-sm">Add Project</span>
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!user) return setShowSignInModal(true);
+                      setEditingProject(null);
+                      setPendingPosition(position);
+                      setIsModalOpen(true);
+                    }}
+                    className={`w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500 ${dragOverPosition === position ? 'ring-2 ring-blue-500' : ''}`}
+                    aria-label="Add new project"
+                  >
+                    <Plus size={48} className="text-zinc-600 mb-2" />
+                    <span className="text-zinc-500 text-sm">Add Project</span>
+                  </button>
+                </div>
               )}
             </div>
           ))}

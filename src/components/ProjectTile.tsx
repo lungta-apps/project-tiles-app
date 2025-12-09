@@ -8,6 +8,10 @@ interface ProjectTileProps {
   onChangeColor: (id: string) => void;
   onShowTasks: (project: Project) => void;
   onToggleCompleted: (id: string) => void;
+  isDragging: boolean;
+  isDragOver: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }
 
 export default function ProjectTile({
@@ -16,6 +20,10 @@ export default function ProjectTile({
   onChangeColor,
   onShowTasks,
   onToggleCompleted,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragEnd,
 }: ProjectTileProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -91,10 +99,11 @@ export default function ProjectTile({
   return (
     <div
       ref={tileRef}
-      className="relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none"
+      draggable
+      className={`relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'ring-2 ring-blue-500' : ''}`}
       style={{
         borderWidth: '2px',
-        borderColor: project.color,
+        borderColor: isDragOver ? '#3B82F6' : project.color,
         boxShadow: `
           0 0 8px ${project.color}80,
           0 0 16px ${project.color}60,
@@ -106,7 +115,16 @@ export default function ProjectTile({
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onDoubleClick={handleShowTasks} // Double-click to show tasks
+      onDoubleClick={handleShowTasks}
+      onDragStart={(e) => {
+        // Cancel long-press timer when drag starts
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+        }
+        onDragStart();
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragEnd={onDragEnd}
       role="button"
       tabIndex={0}
       aria-label={`Project: ${project.name}. Long press to show options.`}
