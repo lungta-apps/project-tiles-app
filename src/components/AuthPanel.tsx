@@ -66,8 +66,8 @@ async function signIn(e: React.FormEvent) {
 
   if (userEmail) {
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-zinc-300">Signed in as {userEmail}</span>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+        <span className="text-sm text-zinc-300 truncate max-w-[200px] sm:max-w-none">Signed in as {userEmail}</span>
         <button
           onClick={signOut}
           className="px-3 py-1 rounded border border-blue-500 text-white hover:bg-blue-600 text-sm"
@@ -80,40 +80,43 @@ async function signIn(e: React.FormEvent) {
   }
 
   return (
-    <form onSubmit={signIn} className="flex items-center gap-2">
-      <input
-        type="email"
-        required
-        placeholder="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-sm text-white"
-      />
-      <input
-        type="password"
-        required
-        placeholder="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="px-2 py-1 rounded bg-zinc-900 border border-zinc-700 text-sm text-white"
-      />
-      <button
-        type="submit"
-        className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-sm"
-        disabled={loading}
-      >
-        {loading ? "…" : "Sign in"}
-      </button>
-			<button
-  type="button"
-  onClick={signUp}
-  className="px-3 py-1 rounded bg-green-600 hover:bg-green-500 text-sm"
-  disabled={loading}
->
-  {loading ? "…" : "Create account"}
-</button>
-
-      {error && <span className="text-red-400 text-xs ml-2">{error}</span>}
+    <form onSubmit={signIn} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="email"
+          required
+          placeholder="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="px-2 py-2 sm:py-1 rounded bg-zinc-900 border border-zinc-700 text-sm text-white w-full sm:w-auto"
+        />
+        <input
+          type="password"
+          required
+          placeholder="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="px-2 py-2 sm:py-1 rounded bg-zinc-900 border border-zinc-700 text-sm text-white w-full sm:w-auto"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          className="flex-1 sm:flex-none px-3 py-2 sm:py-1 rounded bg-blue-600 hover:bg-blue-500 text-sm"
+          disabled={loading}
+        >
+          {loading ? "…" : "Sign in"}
+        </button>
+        <button
+          type="button"
+          onClick={signUp}
+          className="flex-1 sm:flex-none px-3 py-2 sm:py-1 rounded bg-green-600 hover:bg-green-500 text-sm whitespace-nowrap"
+          disabled={loading}
+        >
+          {loading ? "…" : "Create account"}
+        </button>
+      </div>
+      {error && <span className="text-red-400 text-xs sm:ml-2">{error}</span>}
     </form>
   );
 }

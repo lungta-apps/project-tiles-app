@@ -3,9 +3,11 @@ import { Plus } from 'lucide-react';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
 import TaskModal from './TaskModal';
+import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
 import SignInModal from "@/components/SignInModal";
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ProjectGridProps {
   boards: Board[];
@@ -32,6 +34,8 @@ export default function ProjectGrid({
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
+
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
@@ -338,14 +342,25 @@ export default function ProjectGrid({
     );
   }
 
+  // Handler for mobile carousel to add projects
+  const handleMobileAddProject = (position: number) => {
+    if (!user) {
+      setShowSignInModal(true);
+      return;
+    }
+    setEditingProject(null);
+    setPendingPosition(position);
+    setIsModalOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-black p-8">
+    <div className="min-h-screen bg-black p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
+        <div className="mb-4 md:mb-6">
           <AuthPanel />
         </div>
 
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {boards.map((board) => (
             <button
               key={board.id}
@@ -392,7 +407,7 @@ export default function ProjectGrid({
                 setDragOverBoardId(null);
               }}
               className={[
-                "px-3 py-1 rounded-full text-sm border transition-opacity",
+                "px-3 py-1 rounded-full text-sm border transition-opacity whitespace-nowrap flex-shrink-0",
                 currentBoardId === board.id
                   ? "bg-zinc-900 text-white border-4 border-[#00C7BE]"
                   : "bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800",
@@ -417,82 +432,95 @@ export default function ProjectGrid({
               setBoards([...boards, data]);
               setCurrentBoardId(data.id);
             }}
-            className="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700"
+            className="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 flex-shrink-0"
           >
             +
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-6 aspect-square" role="grid" aria-label="Project grid">
-          {gridItems.map(({ position, project }) => (
-            <div
-              key={position}
-              className="border border-zinc-800 rounded-lg p-4"
-              style={{ minHeight: '200px' }}
-              role="gridcell"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                setDragOverPosition(position);
-              }}
-              onDragLeave={() => {
-                setDragOverPosition(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggedPosition !== null) {
-                  handleReorderProjects(draggedPosition, position);
-                }
-                setDraggedPosition(null);
-                setDragOverPosition(null);
-              }}
-            >
-              {project ? (
-                <ProjectTile
-                  project={project}
-                  onDelete={handleDeleteProject}
-                  onChangeColor={handleChangeColor}
-                  onToggleCompleted={handleToggleCompleted}
-                  onShowTasks={handleShowTasks}
-                  isDragging={draggedPosition === position}
-                  isDragOver={dragOverPosition === position}
-                  onDragStart={() => setDraggedPosition(position)}
-                  onDragEnd={() => {
-                    setDraggedPosition(null);
-                    setDragOverPosition(null);
-                  }}
-                />
-              ) : (
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    setDraggedPosition(position);
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragEnd={() => {
-                    setDraggedPosition(null);
-                    setDragOverPosition(null);
-                  }}
-                  className={`w-full h-full ${draggedPosition === position ? 'opacity-50' : ''}`}
-                >
-                  <button
-                    onClick={() => {
-                      if (!user) return setShowSignInModal(true);
-                      setEditingProject(null);
-                      setPendingPosition(position);
-                      setIsModalOpen(true);
+        {/* Mobile: Horizontal card carousel */}
+        {isMobile ? (
+          <MobileProjectCarousel
+            gridItems={gridItems}
+            onAddProject={handleMobileAddProject}
+            onDelete={handleDeleteProject}
+            onChangeColor={handleChangeColor}
+            onToggleCompleted={handleToggleCompleted}
+            onShowTasks={handleShowTasks}
+          />
+        ) : (
+          /* Desktop: 3x3 grid */
+          <div className="grid grid-cols-3 gap-4 md:gap-6 aspect-square" role="grid" aria-label="Project grid">
+            {gridItems.map(({ position, project }) => (
+              <div
+                key={position}
+                className="border border-zinc-800 rounded-lg p-2 md:p-4"
+                style={{ minHeight: '200px' }}
+                role="gridcell"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDragOverPosition(position);
+                }}
+                onDragLeave={() => {
+                  setDragOverPosition(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggedPosition !== null) {
+                    handleReorderProjects(draggedPosition, position);
+                  }
+                  setDraggedPosition(null);
+                  setDragOverPosition(null);
+                }}
+              >
+                {project ? (
+                  <ProjectTile
+                    project={project}
+                    onDelete={handleDeleteProject}
+                    onChangeColor={handleChangeColor}
+                    onToggleCompleted={handleToggleCompleted}
+                    onShowTasks={handleShowTasks}
+                    isDragging={draggedPosition === position}
+                    isDragOver={dragOverPosition === position}
+                    onDragStart={() => setDraggedPosition(position)}
+                    onDragEnd={() => {
+                      setDraggedPosition(null);
+                      setDragOverPosition(null);
                     }}
-                    className={`w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500 ${dragOverPosition === position ? 'ring-2 ring-blue-500' : ''}`}
-                    aria-label="Add new project"
+                  />
+                ) : (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedPosition(position);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragEnd={() => {
+                      setDraggedPosition(null);
+                      setDragOverPosition(null);
+                    }}
+                    className={`w-full h-full ${draggedPosition === position ? 'opacity-50' : ''}`}
                   >
-                    <Plus size={48} className="text-zinc-600 mb-2" />
-                    <span className="text-zinc-500 text-sm">Add Project</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                    <button
+                      onClick={() => {
+                        if (!user) return setShowSignInModal(true);
+                        setEditingProject(null);
+                        setPendingPosition(position);
+                        setIsModalOpen(true);
+                      }}
+                      className={`w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500 ${dragOverPosition === position ? 'ring-2 ring-blue-500' : ''}`}
+                      aria-label="Add new project"
+                    >
+                      <Plus size={48} className="text-zinc-600 mb-2" />
+                      <span className="text-zinc-500 text-sm">Add Project</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <AddProjectModal

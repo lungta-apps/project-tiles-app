@@ -109,8 +109,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-96">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md">
         <h2 className="text-white text-xl mb-4">Tasks for {project.name}</h2>
         <div className="space-y-2">
           {tasks.map((task, i) => (
