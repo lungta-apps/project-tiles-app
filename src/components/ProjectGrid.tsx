@@ -165,7 +165,7 @@ export default function ProjectGrid({
   const handleToggleCompleted = async (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
-    const currentCompleted = (project as any).completed ?? false;
+    const currentCompleted = project.completed ?? false;
     const nextCompleted = !currentCompleted;
     try {
       const { error } = await supabase
@@ -442,6 +442,7 @@ export default function ProjectGrid({
         {isMobile ? (
           <MobileProjectCarousel
             gridItems={gridItems}
+            currentBoardId={currentBoardId}
             onAddProject={handleMobileAddProject}
             onDelete={handleDeleteProject}
             onChangeColor={handleChangeColor}
