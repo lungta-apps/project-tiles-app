@@ -5,6 +5,7 @@ import { Project } from '../lib/supabase';
 
 interface MobileProjectCarouselProps {
   gridItems: { position: number; project: Project | undefined }[];
+  currentBoardId: string | null;
   onAddProject: (position: number) => void;
   onDelete: (id: string) => void;
   onChangeColor: (id: string) => void;
@@ -14,6 +15,7 @@ interface MobileProjectCarouselProps {
 
 export default function MobileProjectCarousel({
   gridItems,
+  currentBoardId,
   onAddProject,
   onDelete,
   onChangeColor,
@@ -78,7 +80,12 @@ export default function MobileProjectCarousel({
     }
   };
 
-  // Reset to first card when grid items change significantly
+  // Reset to first card when board changes
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [currentBoardId]);
+
+  // Adjust index if it's out of bounds after grid items change
   useEffect(() => {
     if (currentIndex >= gridItems.length) {
       setCurrentIndex(Math.max(0, gridItems.length - 1));

@@ -13,7 +13,8 @@ export interface Project {
   position: number;
   created_at: string;
   updated_at: string;
-  board_id: string; // new
+  board_id: string;
+  completed?: boolean;
   tasks?: Task[];
 }
 
