@@ -31,35 +31,49 @@ export default function MobileProjectCarousel({
 
   // Minimum swipe distance to trigger navigation (in pixels)
   const minSwipeDistance = 50;
+  // Minimum horizontal movement before we consider it a swipe (not a long-press)
+  const swipeThreshold = 10;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
-    setIsDragging(true);
+    // Don't set isDragging true yet - wait until user actually moves
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!touchStart) return;
     const currentTouch = e.targetTouches[0].clientX;
-    setTouchEnd(currentTouch);
-    setDragOffset(currentTouch - touchStart);
+    const horizontalDistance = Math.abs(currentTouch - touchStart);
+
+    // Only start dragging if user has moved horizontally past threshold
+    // This allows long-press to work on tiles without interference
+    if (horizontalDistance > swipeThreshold) {
+      setIsDragging(true);
+      setTouchEnd(currentTouch);
+      setDragOffset(currentTouch - touchStart);
+    }
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) {
+    if (!touchStart || !isDragging) {
+      // User didn't swipe, just tapped or long-pressed - reset and let tile handle it
+      setTouchStart(null);
+      setTouchEnd(null);
       setIsDragging(false);
       setDragOffset(0);
       return;
     }
 
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    if (touchEnd) {
+      const distance = touchStart - touchEnd;
+      const isLeftSwipe = distance > minSwipeDistance;
+      const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe && currentIndex < gridItems.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else if (isRightSwipe && currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+      if (isLeftSwipe && currentIndex < gridItems.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else if (isRightSwipe && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
     }
 
     setTouchStart(null);
