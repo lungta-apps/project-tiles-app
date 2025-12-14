@@ -111,25 +111,25 @@ export default function MobileProjectCarousel({
       {/* Card container with swipe support */}
       <div
         ref={containerRef}
-        className="relative w-full overflow-hidden"
+        className="relative w-full"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        style={{ minHeight: '320px' }}
       >
-        <div
-          className="flex transition-transform duration-300 ease-out"
-          style={{
-            transform: `translateX(calc(-${currentIndex * 100}% + ${isDragging ? dragOffset : 0}px))`,
-            transitionDuration: isDragging ? '0ms' : '300ms',
-          }}
-        >
-          {gridItems.map(({ position, project }) => (
+        {/* Only render the current tile */}
+        {(() => {
+          const { position, project } = gridItems[currentIndex];
+          return (
             <div
               key={position}
-              className="w-full flex-shrink-0 px-4"
-              style={{ minHeight: '320px' }}
+              className="w-full px-4"
+              style={{
+                transform: `translateX(${isDragging ? dragOffset : 0}px)`,
+                transition: isDragging ? 'none' : 'transform 300ms ease-out',
+              }}
             >
-              <div className="h-full">
+              <div className="h-[280px]">
                 {project ? (
                   <ProjectTile
                     project={project}
@@ -154,8 +154,8 @@ export default function MobileProjectCarousel({
                 )}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
 
       {/* Navigation controls */}
