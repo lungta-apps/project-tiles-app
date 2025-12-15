@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { supabase, Project, Task } from '../lib/supabase';
 
 interface TaskModalProps {
@@ -47,6 +48,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
   const handleCompletionChange = (index: number, isCompleted: boolean) => {
     const newTasks = [...tasks];
     newTasks[index] = { ...newTasks[index], is_completed: isCompleted };
+    setTasks(newTasks);
+  };
+
+  const handleDeleteTask = (index: number) => {
+    const newTasks = [...tasks];
+    // Remove the task at this index
+    newTasks.splice(index, 1);
+    // Add an empty task at the end to maintain 10 slots
+    newTasks.push({ description: '', is_completed: false });
     setTasks(newTasks);
   };
 
@@ -114,20 +124,29 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
         <h2 className="text-white text-xl mb-4">Tasks for {project.name}</h2>
         <div className="space-y-2">
           {tasks.map((task, i) => (
-            <div key={i} className="flex items-center">
+            <div key={i} className="flex items-center gap-2">
               <input
                 type="checkbox"
-                className="mr-2 h-5 w-5 rounded bg-gray-600 text-blue-500 focus:ring-blue-500"
+                className="h-5 w-5 flex-shrink-0 rounded bg-gray-600 text-blue-500 focus:ring-blue-500"
                 checked={task.is_completed}
                 onChange={(e) => handleCompletionChange(i, e.target.checked)}
               />
               <input
                 type="text"
-                className={`w-full p-2 rounded bg-gray-600 text-white placeholder-gray-400 ${task.is_completed ? 'line-through' : ''}`}
+                className={`flex-1 min-w-0 p-2 rounded bg-gray-600 text-white placeholder-gray-400 ${task.is_completed ? 'line-through' : ''}`}
                 placeholder={`Task ${i + 1}`}
                 value={task.description}
                 onChange={(e) => handleDescriptionChange(i, e.target.value)}
               />
+              <button
+                type="button"
+                onClick={() => handleDeleteTask(i)}
+                className="flex-shrink-0 p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+                aria-label={`Delete task ${i + 1}`}
+                title="Delete task"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
           ))}
         </div>
