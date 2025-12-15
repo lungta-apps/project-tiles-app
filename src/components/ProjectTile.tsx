@@ -124,7 +124,7 @@ export default function ProjectTile({
     <div
       ref={tileRef}
       draggable
-      className={`relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer select-none ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'ring-2 ring-blue-500' : ''} ${project.completed ? 'opacity-50' : ''}`}
+      className={`relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-opacity duration-300 cursor-pointer select-none ${isDragging ? 'opacity-50' : ''} ${project.completed ? 'opacity-50' : ''}`}
       style={{
         borderWidth: '2px',
         borderColor: isDragOver ? '#3B82F6' : project.color,

@@ -454,8 +454,8 @@ export default function ProjectGrid({
           <div className="grid grid-cols-3 gap-4 md:gap-6 aspect-square" role="grid" aria-label="Project grid">
             {gridItems.map(({ position, project }) => (
               <div
-                key={position}
-                className="border border-zinc-800 rounded-lg p-2 md:p-4"
+                key={project?.id ?? `empty-${position}`}
+                className="p-1"
                 style={{ minHeight: '200px' }}
                 role="gridcell"
                 onDragOver={(e) => {
