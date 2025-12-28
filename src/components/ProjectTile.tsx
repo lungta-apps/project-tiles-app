@@ -8,6 +8,7 @@ interface ProjectTileProps {
   onDelete: (id: string) => void;
   onChangeColor: (id: string) => void;
   onShowTasks: (project: Project) => void;
+  onShowNotes: (project: Project) => void;
   onToggleCompleted: (id: string) => void;
   isDragging: boolean;
   isDragOver: boolean;
@@ -20,6 +21,7 @@ export default function ProjectTile({
   onDelete,
   onChangeColor,
   onShowTasks,
+  onShowNotes,
   onToggleCompleted,
   isDragging,
   isDragOver,
@@ -112,6 +114,11 @@ export default function ProjectTile({
     onShowTasks(project);
   };
 
+  const handleShowNotes = () => {
+    setShowMenu(false);
+    onShowNotes(project);
+  };
+
   // The handler from the main branch
   const handleToggleCompleted = () => {
     setShowMenu(false);
@@ -119,6 +126,7 @@ export default function ProjectTile({
   };
 
   const hasIncompleteTasks = project.tasks && project.tasks.some(task => !task.is_completed);
+  const hasNotes = project.notes && project.notes.trim().length > 0;
 
   return (
     <div
@@ -160,10 +168,20 @@ export default function ProjectTile({
         }
       }}
     >
+      {hasNotes && (
+        <div
+          className="absolute top-3 right-10 w-5 h-5 rounded-full"
+          style={{
+            backgroundColor: '#F1C40F',
+            boxShadow: `0 0 8px #F1C40F80, 0 0 16px #F1C40F60, 0 0 24px #F1C40F40`
+          }}
+          aria-label="This project has notes"
+        ></div>
+      )}
       {hasIncompleteTasks && (
-        <div 
+        <div
           className="absolute top-3 right-3 w-5 h-5 rounded-full"
-          style={{ 
+          style={{
             backgroundColor: '#1ABC9C',
             boxShadow: `0 0 8px #1ABC9C80, 0 0 16px #1ABC9C60, 0 0 24px #1ABC9C40`
           }}
@@ -213,9 +231,9 @@ export default function ProjectTile({
               onClick={handleChangeColor}
               className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
               role="menuitem"
-              aria-label="Change project color"
+              aria-label="Edit project"
             >
-              Change Color
+              Edit Project
             </button>
             <button
               onClick={handleToggleCompleted}
@@ -232,6 +250,14 @@ export default function ProjectTile({
               aria-label="Add tasks to project"
             >
               Tasks
+            </button>
+            <button
+              onClick={handleShowNotes}
+              className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+              role="menuitem"
+              aria-label="Add notes to project"
+            >
+              Notes
             </button>
             <button
               onClick={handleDelete}
