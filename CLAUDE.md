@@ -39,8 +39,7 @@ The app uses three main tables:
 - **projects**: Individual project tiles
   - Each project belongs to a board (`board_id` foreign key)
   - Maximum 9 projects per board (3x3 grid positions 0-8)
-  - Fields: `name`, `color` (hex), `position` (0-8), `board_id`
-  - Projects can optionally have a `completed` field
+  - Fields: `name`, `color` (hex), `position` (0-8), `board_id`, `notes` (text), `completed` (boolean)
 
 - **tasks**: Task items belonging to projects
   - Each task belongs to a project (`project_id` foreign key)
@@ -67,24 +66,33 @@ App.tsx
 └── ProjectGrid.tsx (main container)
     ├── AuthPanel.tsx (authentication UI)
     ├── Board tabs (inline in ProjectGrid)
-    ├── 3x3 grid of ProjectTile components
+    ├── 3x3 grid of ProjectTile components (desktop)
+    ├── MobileProjectCarousel.tsx (mobile carousel view)
     ├── AddProjectModal.tsx (create/edit projects)
     ├── TaskModal.tsx (manage 10 tasks per project)
+    ├── NotesModal.tsx (add notes to project)
     └── SignInModal.tsx
 ```
 
 ### Key Interactions
 
-- **Long press** (500ms) on project tile: Shows context menu (Change Color, Mark Completed, Tasks, Delete)
+- **Long press** (500ms) on project tile: Shows context menu (Edit Project, Mark Completed, Tasks, Notes, Delete)
 - **Double-click** on project tile: Opens task modal
 - **Double-click** on board tab: Rename board
 - **Long press** (700ms) on board tab: Delete board (with confirmation)
 - **Click** empty grid cell: Opens add project modal (shows sign-in modal if not authenticated)
+- **Drag-and-drop**: Reorder project tiles and board tabs (desktop only)
 
 ### Visual Indicators
 
-- **Teal dot** (top-right of tile): Indicates project has incomplete tasks
+- **Yellow dot** (top-right of tile, left position): Indicates project has notes
+  - Color: `#F1C40F` with glow effect matching tile border style
+  - Position: `top-3 right-10`
+  - Shown when `project.notes` has content
+
+- **Teal dot** (top-right of tile, right position): Indicates project has incomplete tasks
   - Color: `#1ABC9C` with glow effect matching tile border style
+  - Position: `top-3 right-3`
   - Shown when `project.tasks.some(task => !task.is_completed)`
 
 ### Color System
