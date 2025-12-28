@@ -15,6 +15,7 @@ export interface Project {
   updated_at: string;
   board_id: string;
   completed?: boolean;
+  notes?: string;
   tasks?: Task[];
 }
 

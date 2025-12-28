@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
 import TaskModal from './TaskModal';
+import NotesModal from './NotesModal';
 import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
@@ -30,6 +31,7 @@ export default function ProjectGrid({
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<number | null>(null);
   const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
+  const [selectedProjectForNotes, setSelectedProjectForNotes] = useState<Project | null>(null);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
@@ -207,6 +209,10 @@ export default function ProjectGrid({
 
   const handleShowTasks = (project: Project) => {
     setSelectedProjectForTasks(project);
+  };
+
+  const handleShowNotes = (project: Project) => {
+    setSelectedProjectForNotes(project);
   };
 
   const handleRenameBoard = async (boardId: string, currentName: string) => {
@@ -448,6 +454,7 @@ export default function ProjectGrid({
             onChangeColor={handleChangeColor}
             onToggleCompleted={handleToggleCompleted}
             onShowTasks={handleShowTasks}
+            onShowNotes={handleShowNotes}
           />
         ) : (
           /* Desktop: 3x3 grid */
@@ -482,6 +489,7 @@ export default function ProjectGrid({
                     onChangeColor={handleChangeColor}
                     onToggleCompleted={handleToggleCompleted}
                     onShowTasks={handleShowTasks}
+                    onShowNotes={handleShowNotes}
                     isDragging={draggedPosition === position}
                     isDragOver={dragOverPosition === position}
                     onDragStart={() => setDraggedPosition(position)}
@@ -544,6 +552,16 @@ export default function ProjectGrid({
           project={selectedProjectForTasks}
           onClose={() => {
             setSelectedProjectForTasks(null);
+            loadProjects(currentBoardId);
+          }}
+        />
+      )}
+
+      {selectedProjectForNotes && (
+        <NotesModal
+          project={selectedProjectForNotes}
+          onClose={() => {
+            setSelectedProjectForNotes(null);
             loadProjects(currentBoardId);
           }}
         />
