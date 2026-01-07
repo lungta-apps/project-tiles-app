@@ -4,6 +4,7 @@ import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
 import TaskModal from './TaskModal';
 import NotesModal from './NotesModal';
+import OverviewModal from './OverviewModal';
 import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
@@ -32,6 +33,7 @@ export default function ProjectGrid({
   const [pendingPosition, setPendingPosition] = useState<number | null>(null);
   const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
   const [selectedProjectForNotes, setSelectedProjectForNotes] = useState<Project | null>(null);
+  const [showOverview, setShowOverview] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
@@ -362,8 +364,16 @@ export default function ProjectGrid({
   return (
     <div className="min-h-screen bg-black p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 md:mb-6">
+        <div className="mb-4 md:mb-6 flex items-start justify-between gap-2">
           <AuthPanel />
+          {isMobile && (
+            <button
+              onClick={() => setShowOverview(true)}
+              className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex-shrink-0"
+            >
+              Overview
+            </button>
+          )}
         </div>
 
         <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -566,6 +576,13 @@ export default function ProjectGrid({
           }}
         />
       )}
+
+      <OverviewModal
+        isOpen={showOverview}
+        onClose={() => setShowOverview(false)}
+        projects={projects}
+        boardName={boards.find(b => b.id === currentBoardId)?.name || 'Board'}
+      />
     </div>
   );
 }
