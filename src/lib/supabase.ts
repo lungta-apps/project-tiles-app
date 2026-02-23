@@ -32,7 +32,8 @@ export interface Task {
   id: string;
   project_id: string;
   description: string;
-  is_completed: boolean;
+  status: 'todo' | 'in_progress' | 'done';
+  position: number;
   created_at: string;
   updated_at: string;
 }

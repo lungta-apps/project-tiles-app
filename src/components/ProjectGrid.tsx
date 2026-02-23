@@ -4,6 +4,7 @@ import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
 import TaskModal from './TaskModal';
 import NotesModal from './NotesModal';
+import KanbanView from './KanbanView';
 import OverviewModal from './OverviewModal';
 import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
@@ -33,6 +34,7 @@ export default function ProjectGrid({
   const [pendingPosition, setPendingPosition] = useState<number | null>(null);
   const [selectedProjectForTasks, setSelectedProjectForTasks] = useState<Project | null>(null);
   const [selectedProjectForNotes, setSelectedProjectForNotes] = useState<Project | null>(null);
+  const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
@@ -500,6 +502,7 @@ export default function ProjectGrid({
                     onToggleCompleted={handleToggleCompleted}
                     onShowTasks={handleShowTasks}
                     onShowNotes={handleShowNotes}
+                    onOpenKanban={setSelectedProjectForKanban}
                     isDragging={draggedPosition === position}
                     isDragOver={dragOverPosition === position}
                     onDragStart={() => setDraggedPosition(position)}
@@ -583,6 +586,16 @@ export default function ProjectGrid({
         projects={projects}
         boardName={boards.find(b => b.id === currentBoardId)?.name || 'Board'}
       />
+
+      {selectedProjectForKanban && (
+        <KanbanView
+          project={selectedProjectForKanban}
+          onClose={() => {
+            setSelectedProjectForKanban(null);
+            loadProjects(currentBoardId);
+          }}
+        />
+      )}
     </div>
   );
 }
