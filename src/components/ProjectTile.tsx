@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { LayoutDashboard } from 'lucide-react';
 import { Project } from '../lib/supabase';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -10,6 +11,7 @@ interface ProjectTileProps {
   onShowTasks: (project: Project) => void;
   onShowNotes: (project: Project) => void;
   onToggleCompleted: (id: string) => void;
+  onOpenKanban?: (project: Project) => void;
   isDragging: boolean;
   isDragOver: boolean;
   onDragStart: () => void;
@@ -23,6 +25,7 @@ export default function ProjectTile({
   onShowTasks,
   onShowNotes,
   onToggleCompleted,
+  onOpenKanban,
   isDragging,
   isDragOver,
   onDragStart,
@@ -125,7 +128,7 @@ export default function ProjectTile({
     onToggleCompleted(project.id);
   };
 
-  const hasIncompleteTasks = project.tasks && project.tasks.some(task => !task.is_completed);
+  const hasIncompleteTasks = project.tasks && project.tasks.some(task => task.status !== 'done');
   const hasNotes = project.notes && project.notes.trim().length > 0;
 
   return (
@@ -189,6 +192,22 @@ export default function ProjectTile({
         ></div>
       )}
       <h2 className="text-2xl font-bold text-white text-center px-4">{project.name}</h2>
+
+      <button
+        type="button"
+        className="absolute bottom-3 right-3 text-zinc-400 hover:text-white transition-colors"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onDragStart={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenKanban?.(project);
+        }}
+        aria-label="Open Kanban board"
+        title="Kanban board"
+      >
+        <LayoutDashboard size={16} />
+      </button>
 
       {project.completed && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">

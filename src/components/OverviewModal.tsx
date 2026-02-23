@@ -61,7 +61,7 @@ export default function OverviewModal({ isOpen, onClose, projects, boardName }: 
                     />
                   )}
                   {/* Teal dot - has incomplete tasks */}
-                  {project.tasks && project.tasks.some(task => !task.is_completed) && (
+                  {project.tasks && project.tasks.some(task => task.status !== 'done') && (
                     <div
                       className="absolute top-1 right-1 w-2 h-2 rounded-full"
                       style={{
