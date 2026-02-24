@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Plus, GripVertical } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
@@ -38,37 +38,108 @@ interface DraggableCardProps {
   task: Task;
   color: string;
   onDelete: (id: string) => void;
+  onEdit: (id: string, description: string) => void;
 }
 
-function DraggableCard({ task, color, onDelete }: DraggableCardProps) {
+function DraggableCard({ task, color, onDelete, onEdit }: DraggableCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(task.description);
+  const [confirming, setConfirming] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
 
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus();
+  }, [isEditing]);
+
+  const commitEdit = useCallback(() => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== task.description) {
+      onEdit(task.id, trimmed);
+    } else {
+      setEditValue(task.description);
+    }
+    setIsEditing(false);
+  }, [editValue, task.description, task.id, onEdit]);
+
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
       {...attributes}
-      className="flex items-center gap-2 p-3 bg-zinc-800 rounded-lg border-2 cursor-grab active:cursor-grabbing select-none"
+      className="flex items-center gap-2 p-3 bg-zinc-800 rounded-lg border-2 select-none"
       style={{
         ...glow(color),
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.2 : 1,
-        touchAction: 'none',
       }}
     >
-      <span className="flex-1 text-white text-sm break-words min-w-0">{task.description}</span>
-      <button
-        type="button"
+      {/* Drag handle */}
+      <span
+        {...listeners}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => onDelete(task.id)}
-        className="flex-shrink-0 text-zinc-400 hover:text-red-400 transition-colors"
-        aria-label="Delete task"
+        className="flex-shrink-0 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Drag to reorder"
       >
-        <X size={14} />
-      </button>
+        <GripVertical size={14} />
+      </span>
+
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitEdit();
+            if (e.key === 'Escape') { setEditValue(task.description); setIsEditing(false); }
+          }}
+          onBlur={commitEdit}
+          className="flex-1 min-w-0 bg-zinc-700 text-white text-sm rounded px-2 py-0.5 focus:outline-none border border-zinc-500"
+        />
+      ) : (
+        <span
+          className="flex-1 text-white text-sm break-words min-w-0 cursor-text"
+          onDoubleClick={() => setIsEditing(true)}
+          title="Double-click to edit"
+        >
+          {task.description}
+        </span>
+      )}
+
+      {confirming ? (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => { setConfirming(false); onDelete(task.id); }}
+            className="px-2 py-0.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => setConfirming(false)}
+            className="px-2 py-0.5 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => setConfirming(true)}
+          className="flex-shrink-0 text-zinc-400 hover:text-red-400 transition-colors"
+          aria-label="Delete task"
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -82,6 +153,7 @@ function CardOverlay({ task }: { task: Task }) {
       className="flex items-center gap-2 p-3 bg-zinc-800 rounded-lg border-2 cursor-grabbing select-none"
       style={glow(color)}
     >
+      <GripVertical size={14} className="flex-shrink-0 text-zinc-500" />
       <span className="flex-1 text-white text-sm break-words min-w-0">{task.description}</span>
       <X size={14} className="flex-shrink-0 text-zinc-400" />
     </div>
@@ -94,11 +166,12 @@ interface DroppableColumnProps {
   status: Status;
   tasks: Task[];
   onDelete: (id: string) => void;
+  onEdit: (id: string, description: string) => void;
   onAddTask: (status: Status, description: string) => void;
   canAddMore: boolean;
 }
 
-function DroppableColumn({ status, tasks, onDelete, onAddTask, canAddMore }: DroppableColumnProps) {
+function DroppableColumn({ status, tasks, onDelete, onEdit, onAddTask, canAddMore }: DroppableColumnProps) {
   const { label, color } = COLUMN_CONFIG[status];
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const [isAdding, setIsAdding] = useState(false);
@@ -145,7 +218,7 @@ function DroppableColumn({ status, tasks, onDelete, onAddTask, canAddMore }: Dro
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {tasks.map((task) => (
-              <DraggableCard key={task.id} task={task} color={color} onDelete={onDelete} />
+              <DraggableCard key={task.id} task={task} color={color} onDelete={onDelete} onEdit={onEdit} />
             ))}
           </div>
         </SortableContext>
@@ -281,6 +354,19 @@ export default function KanbanView({ project, onClose }: KanbanViewProps) {
     }
   };
 
+  const handleEditTask = async (taskId: string, description: string) => {
+    const previousTasks = tasks;
+    setTasks(tasks.map((t) => (t.id === taskId ? { ...t, description } : t)));
+    const { error } = await supabase
+      .from('tasks')
+      .update({ description, updated_at: new Date().toISOString() })
+      .eq('id', taskId);
+    if (error) {
+      console.error('Error updating task:', error);
+      setTasks(previousTasks);
+    }
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     const previousTasks = tasks;
     setTasks(tasks.filter((t) => t.id !== taskId));
@@ -293,7 +379,7 @@ export default function KanbanView({ project, onClose }: KanbanViewProps) {
   };
 
   const handleAddTask = async (status: Status, description: string) => {
-    if (tasks.length >= 10) return;
+    if (tasks.length >= 50) return;
 
     const { data, error } = await supabase
       .from('tasks')
@@ -337,8 +423,9 @@ export default function KanbanView({ project, onClose }: KanbanViewProps) {
               status={status}
               tasks={tasks.filter((t) => t.status === status)}
               onDelete={handleDeleteTask}
+              onEdit={handleEditTask}
               onAddTask={handleAddTask}
-              canAddMore={tasks.length < 10}
+              canAddMore={tasks.length < 50}
             />
           ))}
           <DragOverlay>
