@@ -39,6 +39,7 @@ interface SortableTaskRowProps {
 }
 
 function SortableTaskRow({ task, index, onDescriptionChange, onStatusCycle, onDelete }: SortableTaskRowProps) {
+  const [confirming, setConfirming] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.key,
   });
@@ -86,21 +87,40 @@ function SortableTaskRow({ task, index, onDescriptionChange, onStatusCycle, onDe
         className={`flex-1 min-w-0 p-2 rounded bg-gray-600 placeholder-gray-400 ${
           task.status === 'done' ? 'line-through text-gray-400' : 'text-white'
         }`}
-        placeholder={`Task ${index + 1}`}
+        placeholder="Task description"
         value={task.description}
         onChange={(e) => onDescriptionChange(index, e.target.value)}
       />
 
-      {/* Delete button */}
-      <button
-        type="button"
-        onClick={() => onDelete(index)}
-        className="flex-shrink-0 p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
-        aria-label={`Delete task ${index + 1}`}
-        title="Delete task"
-      >
-        <Trash2 size={18} />
-      </button>
+      {/* Delete button / inline confirmation */}
+      {confirming ? (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => { setConfirming(false); onDelete(index); }}
+            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="px-2 py-1 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => task.description ? setConfirming(true) : onDelete(index)}
+          className="flex-shrink-0 p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+          aria-label={`Delete task ${index + 1}`}
+          title="Delete task"
+        >
+          <Trash2 size={18} />
+        </button>
+      )}
     </div>
   );
 }
@@ -108,9 +128,7 @@ function SortableTaskRow({ task, index, onDescriptionChange, onStatusCycle, onDe
 // --- TaskModal ---
 
 const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
-  const [tasks, setTasks] = useState<UITask[]>(
-    Array(10).fill(null).map(() => ({ key: makeKey(), id: null, description: '', status: 'todo' as const }))
-  );
+  const [tasks, setTasks] = useState<UITask[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -126,23 +144,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
         return;
       }
 
-      const loadedTasks: UITask[] = Array(10).fill(null).map(() => ({
-        key: makeKey(),
-        id: null,
-        description: '',
-        status: 'todo' as const,
+      const loadedTasks: UITask[] = (data ?? []).map((task) => ({
+        key: task.id,
+        id: task.id,
+        description: task.description,
+        status: task.status,
       }));
-
-      data?.forEach((task, index) => {
-        if (index < 10) {
-          loadedTasks[index] = {
-            key: task.id,
-            id: task.id,
-            description: task.description,
-            status: task.status,
-          };
-        }
-      });
 
       setTasks(loadedTasks);
     };
@@ -169,10 +176,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
     if (task.id) {
       setDeletedIds((prev) => [...prev, task.id!]);
     }
-    const newTasks = [...tasks];
-    newTasks.splice(index, 1);
-    newTasks.push({ key: makeKey(), id: null, description: '', status: 'todo' as const });
-    setTasks(newTasks);
+    setTasks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddTask = () => {
+    setTasks((prev) => [...prev, { key: makeKey(), id: null, description: '', status: 'todo' as const }]);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -239,7 +247,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
         <h2 className="text-white text-xl mb-4">Tasks for {project.name}</h2>
         <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={tasks.map((t) => t.key)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
               {tasks.map((task, i) => (
                 <SortableTaskRow
                   key={task.key}
@@ -253,6 +261,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ project, onClose }) => {
             </div>
           </SortableContext>
         </DndContext>
+        <button
+          type="button"
+          onClick={handleAddTask}
+          className="mt-3 w-full py-2 text-sm text-zinc-400 hover:text-white border border-dashed border-zinc-600 hover:border-zinc-400 rounded transition-colors"
+        >
+          + Add Task
+        </button>
         <div className="mt-4 flex justify-end">
           <button
             onClick={handleSaveTasks}
