@@ -80,7 +80,6 @@ function DraggableCard({ task, color, onDelete, onEdit }: DraggableCardProps) {
       {/* Drag handle */}
       <span
         {...listeners}
-        onPointerDown={(e) => e.stopPropagation()}
         className="flex-shrink-0 text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing touch-none"
         aria-label="Drag to reorder"
       >
