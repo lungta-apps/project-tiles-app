@@ -144,7 +144,6 @@ export default function ProjectTile({
           0 0 16px ${project.color}60,
           0 0 24px ${project.color}40
         `,
-        touchAction: dragListeners ? 'none' : undefined,
       }}
       {...dragListeners}
       {...dragAttributes}
