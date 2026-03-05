@@ -1,5 +1,18 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import ProjectTile from './ProjectTile';
 import AddProjectModal from './AddProjectModal';
 import TaskModal from './TaskModal';
@@ -12,6 +25,77 @@ import AuthPanel from "@/components/AuthPanel";
 import SignInModal from "@/components/SignInModal";
 import { useIsMobile } from '@/hooks/useIsMobile';
 
+// --- SortableGridCell ---
+interface SortableGridCellProps {
+  position: number;
+  project: Project | undefined;
+  onAddProject: (position: number) => void;
+  onDelete: (id: string) => void;
+  onChangeColor: (id: string) => void;
+  onToggleCompleted: (id: string) => void;
+  onShowTasks: (project: Project) => void;
+  onShowNotes: (project: Project) => void;
+  onOpenKanban: (project: Project) => void;
+}
+
+function SortableGridCell({
+  position,
+  project,
+  onAddProject,
+  onDelete,
+  onChangeColor,
+  onToggleCompleted,
+  onShowTasks,
+  onShowNotes,
+  onOpenKanban,
+}: SortableGridCellProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({ id: position });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    minHeight: '200px',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-1" role="gridcell">
+      {project ? (
+        <ProjectTile
+          project={project}
+          onDelete={onDelete}
+          onChangeColor={onChangeColor}
+          onToggleCompleted={onToggleCompleted}
+          onShowTasks={onShowTasks}
+          onShowNotes={onShowNotes}
+          onOpenKanban={onOpenKanban}
+          isDragging={isDragging}
+          isDragOver={isOver}
+          dragListeners={listeners as React.HTMLAttributes<HTMLDivElement>}
+          dragAttributes={attributes as React.HTMLAttributes<HTMLDivElement>}
+        />
+      ) : (
+        <div
+          {...attributes}
+          {...listeners}
+          style={{ touchAction: 'none' }}
+          className={`w-full h-full ${isDragging ? 'opacity-50' : ''}`}
+        >
+          <button
+            onClick={() => onAddProject(position)}
+            className={`w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500 ${isOver ? 'ring-2 ring-blue-500' : ''}`}
+            aria-label="Add new project"
+          >
+            <Plus size={48} className="text-zinc-600 mb-2" />
+            <span className="text-zinc-500 text-sm">Add Project</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- ProjectGrid ---
 interface ProjectGridProps {
   boards: Board[];
   currentBoardId: string | null;
@@ -38,8 +122,7 @@ export default function ProjectGrid({
   const [showOverview, setShowOverview] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
-  const [draggedPosition, setDraggedPosition] = useState<number | null>(null);
-  const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
+  const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -344,6 +427,23 @@ export default function ProjectGrid({
     return { position: index, project };
   });
 
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragPosition(event.active.id as number);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragPosition(null);
+    if (over && active.id !== over.id) {
+      handleReorderProjects(active.id as number, over.id as number);
+    }
+  };
+
   if (loading && projects.length === 0) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -469,79 +569,55 @@ export default function ProjectGrid({
             onShowNotes={handleShowNotes}
           />
         ) : (
-          /* Desktop: 3x3 grid */
-          <div className="grid grid-cols-3 gap-4 md:gap-6 aspect-square" role="grid" aria-label="Project grid">
-            {gridItems.map(({ position, project }) => (
-              <div
-                key={project?.id ?? `empty-${position}`}
-                className="p-1"
-                style={{ minHeight: '200px' }}
-                role="gridcell"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'move';
-                  setDragOverPosition(position);
-                }}
-                onDragLeave={() => {
-                  setDragOverPosition(null);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (draggedPosition !== null) {
-                    handleReorderProjects(draggedPosition, position);
-                  }
-                  setDraggedPosition(null);
-                  setDragOverPosition(null);
-                }}
-              >
-                {project ? (
-                  <ProjectTile
+          /* Desktop/tablet: 3x3 grid with touch-friendly drag-and-drop */
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={[0, 1, 2, 3, 4, 5, 6, 7, 8]} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-3 gap-4 md:gap-6 aspect-square" role="grid" aria-label="Project grid">
+                {gridItems.map(({ position, project }) => (
+                  <SortableGridCell
+                    key={project?.id ?? `empty-${position}`}
+                    position={position}
                     project={project}
+                    onAddProject={handleMobileAddProject}
                     onDelete={handleDeleteProject}
                     onChangeColor={handleChangeColor}
                     onToggleCompleted={handleToggleCompleted}
                     onShowTasks={handleShowTasks}
                     onShowNotes={handleShowNotes}
                     onOpenKanban={setSelectedProjectForKanban}
-                    isDragging={draggedPosition === position}
-                    isDragOver={dragOverPosition === position}
-                    onDragStart={() => setDraggedPosition(position)}
-                    onDragEnd={() => {
-                      setDraggedPosition(null);
-                      setDragOverPosition(null);
-                    }}
                   />
-                ) : (
-                  <div
-                    draggable
-                    onDragStart={(e) => {
-                      setDraggedPosition(position);
-                      e.dataTransfer.effectAllowed = 'move';
-                    }}
-                    onDragEnd={() => {
-                      setDraggedPosition(null);
-                      setDragOverPosition(null);
-                    }}
-                    className={`w-full h-full ${draggedPosition === position ? 'opacity-50' : ''}`}
-                  >
-                    <button
-                      onClick={() => {
-                        if (!user) return setShowSignInModal(true);
-                        setEditingProject(null);
-                        setPendingPosition(position);
-                        setIsModalOpen(true);
-                      }}
-                      className={`w-full h-full bg-zinc-900 rounded-lg flex flex-col items-center justify-center transition-all duration-300 hover:bg-zinc-800 hover:border-zinc-600 border-2 border-zinc-700 border-dashed focus:outline-none focus:ring-2 focus:ring-blue-500 ${dragOverPosition === position ? 'ring-2 ring-blue-500' : ''}`}
-                      aria-label="Add new project"
-                    >
-                      <Plus size={48} className="text-zinc-600 mb-2" />
-                      <span className="text-zinc-500 text-sm">Add Project</span>
-                    </button>
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeDragPosition !== null && (() => {
+                const item = gridItems.find(g => g.position === activeDragPosition);
+                return (
+                  <div style={{ minHeight: '200px', padding: '4px', opacity: 0.9, cursor: 'grabbing', pointerEvents: 'none' }}>
+                    {item?.project ? (
+                      <ProjectTile
+                        project={item.project}
+                        onDelete={() => {}}
+                        onChangeColor={() => {}}
+                        onToggleCompleted={() => {}}
+                        onShowTasks={() => {}}
+                        onShowNotes={() => {}}
+                        isDragging={false}
+                        isDragOver={false}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-zinc-900 rounded-lg border-2 border-zinc-700 border-dashed" style={{ minHeight: '200px' }} />
+                    )}
+                  </div>
+                );
+              })()}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 

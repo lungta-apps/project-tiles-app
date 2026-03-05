@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { Project } from '../lib/supabase';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -14,8 +14,8 @@ interface ProjectTileProps {
   onOpenKanban?: (project: Project) => void;
   isDragging: boolean;
   isDragOver: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
+  dragListeners?: React.HTMLAttributes<HTMLDivElement>;
+  dragAttributes?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 export default function ProjectTile({
@@ -28,8 +28,8 @@ export default function ProjectTile({
   onOpenKanban,
   isDragging,
   isDragOver,
-  onDragStart,
-  onDragEnd,
+  dragListeners,
+  dragAttributes,
 }: ProjectTileProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -39,7 +39,8 @@ export default function ProjectTile({
   const isMobile = useIsMobile();
 
   // Max distance finger can move before long-press is cancelled
-  const maxTouchMove = 10;
+  // Must match dnd-kit TouchSensor tolerance so drag start cancels long-press
+  const maxTouchMove = 5;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -134,7 +135,6 @@ export default function ProjectTile({
   return (
     <div
       ref={tileRef}
-      draggable
       className={`relative w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center transition-opacity duration-300 cursor-pointer select-none ${isDragging ? 'opacity-50' : ''} ${project.completed ? 'opacity-50' : ''}`}
       style={{
         borderWidth: '2px',
@@ -144,7 +144,10 @@ export default function ProjectTile({
           0 0 16px ${project.color}60,
           0 0 24px ${project.color}40
         `,
+        touchAction: dragListeners ? 'none' : undefined,
       }}
+      {...dragListeners}
+      {...dragAttributes}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -152,15 +155,6 @@ export default function ProjectTile({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onDoubleClick={handleShowTasks}
-      onDragStart={(e) => {
-        // Cancel long-press timer when drag starts
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-        }
-        onDragStart();
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragEnd={onDragEnd}
       role="button"
       tabIndex={0}
       aria-label={`Project: ${project.name}. Long press to show options.`}

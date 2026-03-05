@@ -142,8 +142,6 @@ export default function MobileProjectCarousel({
                     onShowNotes={onShowNotes}
                     isDragging={false}
                     isDragOver={false}
-                    onDragStart={() => {}}
-                    onDragEnd={() => {}}
                   />
                 ) : (
                   <button
