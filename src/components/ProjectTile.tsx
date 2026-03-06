@@ -142,6 +142,11 @@ export default function ProjectTile({
   const hasIncompleteTasks = project.tasks && project.tasks.some(task => task.status !== 'done');
   const hasNotes = project.notes && project.notes.trim().length > 0;
 
+  // Merge our touch handlers with dnd-kit's so neither overrides the other.
+  // Spreading dragListeners then defining onTouchStart directly would override dnd-kit's handler.
+  const { onTouchStart: dndTouchStart, onTouchMove: dndTouchMove, onTouchEnd: dndTouchEnd, ...otherListeners } =
+    (dragListeners ?? {}) as React.HTMLAttributes<HTMLDivElement>;
+
   return (
     <div
       ref={tileRef}
@@ -155,14 +160,15 @@ export default function ProjectTile({
           0 0 24px ${project.color}40
         `,
       }}
-      {...dragListeners}
+      {...otherListeners}
       {...dragAttributes}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={(e) => { handleTouchStart(e); dndTouchStart?.(e); }}
+      onTouchMove={(e) => { handleTouchMove(e); dndTouchMove?.(e); }}
+      onTouchEnd={(e) => { handleTouchEnd(); dndTouchEnd?.(e); }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onContextMenu={(e) => e.preventDefault()}
       onDoubleClick={handleShowTasks}
       role="button"
       tabIndex={0}
