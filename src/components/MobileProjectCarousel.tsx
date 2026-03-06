@@ -12,6 +12,7 @@ interface MobileProjectCarouselProps {
   onToggleCompleted: (id: string) => void;
   onShowTasks: (project: Project) => void;
   onShowNotes: (project: Project) => void;
+  onRequestMove: (project: Project) => void;
 }
 
 export default function MobileProjectCarousel({
@@ -23,6 +24,7 @@ export default function MobileProjectCarousel({
   onToggleCompleted,
   onShowTasks,
   onShowNotes,
+  onRequestMove,
 }: MobileProjectCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -140,6 +142,7 @@ export default function MobileProjectCarousel({
                     onToggleCompleted={onToggleCompleted}
                     onShowTasks={onShowTasks}
                     onShowNotes={onShowNotes}
+                    onRequestMove={onRequestMove}
                     isDragging={false}
                     isDragOver={false}
                   />

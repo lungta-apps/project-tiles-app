@@ -36,6 +36,7 @@ interface SortableGridCellProps {
   onShowTasks: (project: Project) => void;
   onShowNotes: (project: Project) => void;
   onOpenKanban: (project: Project) => void;
+  onRequestMove: (project: Project) => void;
 }
 
 function SortableGridCell({
@@ -48,6 +49,7 @@ function SortableGridCell({
   onShowTasks,
   onShowNotes,
   onOpenKanban,
+  onRequestMove,
 }: SortableGridCellProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
     useSortable({ id: position });
@@ -69,6 +71,7 @@ function SortableGridCell({
           onShowTasks={onShowTasks}
           onShowNotes={onShowNotes}
           onOpenKanban={onOpenKanban}
+          onRequestMove={onRequestMove}
           isDragging={isDragging}
           isDragOver={isOver}
           dragListeners={listeners as React.HTMLAttributes<HTMLDivElement>}
@@ -122,6 +125,7 @@ export default function ProjectGrid({
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
+  const [projectToMove, setProjectToMove] = useState<Project | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -566,6 +570,7 @@ export default function ProjectGrid({
             onToggleCompleted={handleToggleCompleted}
             onShowTasks={handleShowTasks}
             onShowNotes={handleShowNotes}
+            onRequestMove={setProjectToMove}
           />
         ) : (
           /* Desktop/tablet: 3x3 grid with touch-friendly drag-and-drop */
@@ -589,6 +594,7 @@ export default function ProjectGrid({
                     onShowTasks={handleShowTasks}
                     onShowNotes={handleShowNotes}
                     onOpenKanban={setSelectedProjectForKanban}
+                    onRequestMove={setProjectToMove}
                   />
                 ))}
               </div>
@@ -670,6 +676,57 @@ export default function ProjectGrid({
             loadProjects(currentBoardId);
           }}
         />
+      )}
+
+      {projectToMove && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setProjectToMove(null)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 shadow-2xl mx-4 w-full max-w-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-medium mb-4 text-center text-white">
+              Move <span className="font-bold" style={{ color: projectToMove.color }}>"{projectToMove.name}"</span> to...
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 9 }, (_, i) => {
+                const cellProject = projects.find(p => p.position === i);
+                const isCurrent = projectToMove.position === i;
+                return (
+                  <button
+                    key={i}
+                    disabled={isCurrent}
+                    onClick={() => {
+                      handleReorderProjects(projectToMove.position, i);
+                      setProjectToMove(null);
+                    }}
+                    className={`h-16 rounded-lg border text-xs font-medium transition-colors px-1 overflow-hidden ${
+                      isCurrent
+                        ? 'cursor-not-allowed opacity-50'
+                        : cellProject
+                        ? 'border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700 active:bg-zinc-600'
+                        : 'border-dashed border-zinc-700 bg-zinc-950 text-zinc-500 hover:bg-zinc-800'
+                    }`}
+                    style={isCurrent ? { borderColor: projectToMove.color, borderWidth: '2px' } : {}}
+                  >
+                    {isCurrent ? '(here)' : cellProject
+                      ? <span className="block truncate leading-tight">{cellProject.name}</span>
+                      : <span className="text-zinc-600">empty</span>
+                    }
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setProjectToMove(null)}
+              className="mt-4 w-full py-2 text-zinc-500 hover:text-white text-sm transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
