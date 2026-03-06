@@ -78,7 +78,6 @@ function SortableGridCell({
         <div
           {...attributes}
           {...listeners}
-          style={{ touchAction: 'none' }}
           className={`w-full h-full ${isDragging ? 'opacity-50' : ''}`}
         >
           <button
