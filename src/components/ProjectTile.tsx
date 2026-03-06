@@ -85,6 +85,16 @@ export default function ProjectTile({
     }
   };
 
+  // When dnd-kit activates a drag, cancel the long-press timer.
+  // dnd-kit calls preventDefault() on touch events after drag starts,
+  // so handleTouchMove never fires and the timer must be cleared here.
+  useEffect(() => {
+    if (isDragging && longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, [isDragging]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (tileRef.current && !tileRef.current.contains(event.target as Node)) {
