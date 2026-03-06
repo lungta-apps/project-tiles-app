@@ -12,6 +12,7 @@ interface ProjectTileProps {
   onShowNotes: (project: Project) => void;
   onToggleCompleted: (id: string) => void;
   onOpenKanban?: (project: Project) => void;
+  onRequestMove?: (project: Project) => void;
   isDragging: boolean;
   isDragOver: boolean;
   dragListeners?: React.HTMLAttributes<HTMLDivElement>;
@@ -26,6 +27,7 @@ export default function ProjectTile({
   onShowNotes,
   onToggleCompleted,
   onOpenKanban,
+  onRequestMove,
   isDragging,
   isDragOver,
   dragListeners,
@@ -89,9 +91,12 @@ export default function ProjectTile({
   // dnd-kit calls preventDefault() on touch events after drag starts,
   // so handleTouchMove never fires and the timer must be cleared here.
   useEffect(() => {
-    if (isDragging && longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+    if (isDragging) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      setShowMenu(false);
     }
   }, [isDragging]);
 
@@ -144,7 +149,7 @@ export default function ProjectTile({
 
   // Merge our touch handlers with dnd-kit's so neither overrides the other.
   // Spreading dragListeners then defining onTouchStart directly would override dnd-kit's handler.
-  const { onTouchStart: dndTouchStart, onTouchMove: dndTouchMove, onTouchEnd: dndTouchEnd, ...otherListeners } =
+  const { onTouchStart: dndTouchStart, onTouchMove: dndTouchMove, onTouchEnd: dndTouchEnd, onMouseDown: dndMouseDown, ...otherListeners } =
     (dragListeners ?? {}) as React.HTMLAttributes<HTMLDivElement>;
 
   return (
@@ -165,7 +170,7 @@ export default function ProjectTile({
       onTouchStart={(e) => { handleTouchStart(e); dndTouchStart?.(e); }}
       onTouchMove={(e) => { handleTouchMove(e); dndTouchMove?.(e); }}
       onTouchEnd={(e) => { handleTouchEnd(); dndTouchEnd?.(e); }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={(e) => { handleMouseDown(e); dndMouseDown?.(e); }}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onContextMenu={(e) => e.preventDefault()}
@@ -287,6 +292,16 @@ export default function ProjectTile({
             >
               Notes
             </button>
+            {onRequestMove && (
+              <button
+                onClick={() => { setShowMenu(false); onRequestMove(project); }}
+                className="w-full px-6 py-3 text-left text-white hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
+                role="menuitem"
+                aria-label="Move to position"
+              >
+                Move to Position
+              </button>
+            )}
             <button
               onClick={handleDelete}
               className="w-full px-6 py-3 text-left text-red-400 hover:bg-zinc-800 transition-colors duration-200 focus:outline-none focus:bg-zinc-700"
