@@ -79,8 +79,7 @@ App.tsx
 
 - **Long press** (500ms) on project tile: Shows context menu (Edit Project, Mark Completed, Tasks, Notes, Delete)
 - **Double-click** on project tile: Opens task modal
-- **Double-click** on board tab: Rename board
-- **Long press** (700ms) on board tab: Delete board (with confirmation)
+- **Double-tap/double-click** on board tab: Opens a menu with Rename and Delete options
 - **Click** empty grid cell: Opens add project modal (shows sign-in modal if not authenticated)
 - **Drag-and-drop**: Reorder project tiles and board tabs (desktop only)
 - **Overview button** (mobile only): Shows mini 3x3 grid popup of all tiles for quick reference
