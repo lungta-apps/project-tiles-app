@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import {
   DndContext,
@@ -126,6 +126,8 @@ export default function ProjectGrid({
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
   const [projectToMove, setProjectToMove] = useState<Project | null>(null);
+  const [boardMenuId, setBoardMenuId] = useState<string | null>(null);
+  const lastTabTapRef = useRef<{ boardId: string; time: number } | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -486,24 +488,18 @@ export default function ProjectGrid({
             <button
               key={board.id}
               draggable
-              onClick={() => setCurrentBoardId(board.id)}
-              onDoubleClick={() => handleRenameBoard(board.id, board.name)}
-              onMouseDown={(e) => {
-                const timer = setTimeout(() => handleDeleteBoard(board.id), 700);
-                (e.target as HTMLElement).dataset.longPressTimer = String(timer);
+              onClick={() => {
+                const now = Date.now();
+                if (lastTabTapRef.current?.boardId === board.id && now - lastTabTapRef.current.time < 400) {
+                  lastTabTapRef.current = null;
+                  setBoardMenuId(board.id);
+                } else {
+                  lastTabTapRef.current = { boardId: board.id, time: now };
+                  setCurrentBoardId(board.id);
+                }
               }}
-              onMouseUp={(e) => {
-                const timer = (e.target as HTMLElement).dataset.longPressTimer;
-                if (timer) clearTimeout(Number(timer));
-              }}
-              onMouseLeave={(e) => {
-                const timer = (e.target as HTMLElement).dataset.longPressTimer;
-                if (timer) clearTimeout(Number(timer));
-              }}
+              onContextMenu={(e) => e.preventDefault()}
               onDragStart={(e) => {
-                // Cancel long-press timer when drag starts
-                const timer = (e.target as HTMLElement).dataset.longPressTimer;
-                if (timer) clearTimeout(Number(timer));
                 setDraggedBoardId(board.id);
                 e.dataTransfer.effectAllowed = 'move';
               }}
@@ -677,6 +673,44 @@ export default function ProjectGrid({
           }}
         />
       )}
+
+      {boardMenuId && (() => {
+        const board = boards.find(b => b.id === boardMenuId);
+        if (!board) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+            onClick={() => setBoardMenuId(null)}
+          >
+            <div
+              className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 shadow-2xl mx-4 w-full max-w-xs"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm text-zinc-400 text-center mb-4">Board: <span className="text-white font-medium">{board.name}</span></p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { setBoardMenuId(null); handleRenameBoard(board.id, board.name); }}
+                  className="w-full py-3 rounded-lg bg-zinc-800 text-white hover:bg-zinc-700 text-sm font-medium transition-colors"
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={() => { setBoardMenuId(null); handleDeleteBoard(board.id); }}
+                  className="w-full py-3 rounded-lg bg-zinc-800 text-red-400 hover:bg-zinc-700 text-sm font-medium transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+              <button
+                onClick={() => setBoardMenuId(null)}
+                className="mt-3 w-full py-2 text-zinc-500 hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {projectToMove && (
         <div
