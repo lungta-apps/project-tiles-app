@@ -4,7 +4,6 @@ import {
   DndContext,
   DragOverlay,
   MouseSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   closestCenter,
@@ -434,7 +433,6 @@ export default function ProjectGrid({
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 20 } }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
