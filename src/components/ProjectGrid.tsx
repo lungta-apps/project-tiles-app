@@ -18,6 +18,7 @@ import TaskModal from './TaskModal';
 import NotesModal from './NotesModal';
 import KanbanView from './KanbanView';
 import OverviewModal from './OverviewModal';
+import TaskOverviewModal from './TaskOverviewModal';
 import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
@@ -121,6 +122,7 @@ export default function ProjectGrid({
   const [selectedProjectForNotes, setSelectedProjectForNotes] = useState<Project | null>(null);
   const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
   const [showOverview, setShowOverview] = useState(false);
+  const [showTaskOverview, setShowTaskOverview] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
@@ -481,7 +483,8 @@ export default function ProjectGrid({
           )}
         </div>
 
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide flex-1 min-w-0">
           {boards.map((board) => (
             <button
               key={board.id}
@@ -551,6 +554,15 @@ export default function ProjectGrid({
           >
             +
           </button>
+          </div>
+          {user && (
+            <button
+              onClick={() => setShowTaskOverview(true)}
+              className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex-shrink-0"
+            >
+              Tasks
+            </button>
+          )}
         </div>
 
         {/* Mobile: Horizontal card carousel */}
@@ -634,6 +646,12 @@ export default function ProjectGrid({
         title={editingProject ? 'Edit Project' : 'Add New Project'}
       />
       <SignInModal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)} />
+
+      <TaskOverviewModal
+        isOpen={showTaskOverview}
+        onClose={() => setShowTaskOverview(false)}
+        boards={boards}
+      />
 
       {selectedProjectForTasks && (
         <TaskModal

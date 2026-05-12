@@ -44,7 +44,7 @@ The app uses three main tables:
 - **tasks**: Task items belonging to projects
   - Each task belongs to a project (`project_id` foreign key)
   - Maximum 10 tasks per project
-  - Fields: `description`, `is_completed` (boolean)
+  - Fields: `description`, `status` (`'todo'` | `'in_progress'` | `'done'`), `position` (int)
 
 ### State Management & Data Flow
 
@@ -72,6 +72,7 @@ App.tsx
     ├── TaskModal.tsx (manage 10 tasks per project)
     ├── NotesModal.tsx (add notes to project)
     ├── OverviewModal.tsx (mobile-only mini grid view)
+    ├── TaskOverviewModal.tsx (cross-board task summary, all screen sizes)
     └── SignInModal.tsx
 ```
 
@@ -83,6 +84,7 @@ App.tsx
 - **Click** empty grid cell: Opens add project modal (shows sign-in modal if not authenticated)
 - **Drag-and-drop**: Reorder project tiles and board tabs (desktop only)
 - **Overview button** (mobile only): Shows mini 3x3 grid popup of all tiles for quick reference
+- **Tasks button** (top-right of tab row, signed-in users only): Opens TaskOverviewModal to browse all to-do or in-progress tasks across every board
 
 ### Visual Indicators
 
@@ -94,7 +96,7 @@ App.tsx
 - **Teal dot** (top-right of tile, right position): Indicates project has incomplete tasks
   - Color: `#1ABC9C` with glow effect matching tile border style
   - Position: `top-3 right-3`
-  - Shown when `project.tasks.some(task => !task.is_completed)`
+  - Shown when `project.tasks.some(task => task.status !== 'done')`
 
 ### Color System
 
