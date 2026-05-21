@@ -39,7 +39,7 @@ The app uses three main tables:
 - **projects**: Individual project tiles
   - Each project belongs to a board (`board_id` foreign key)
   - Maximum 9 projects per board (3x3 grid positions 0-8)
-  - Fields: `name`, `color` (hex), `position` (0-8), `board_id`, `notes` (text), `completed` (boolean)
+  - Fields: `name`, `color` (hex), `position` (0-8), `board_id`, `notes` (text), `completed` (boolean), `start_date` (date), `end_date` (date)
 
 - **tasks**: Task items belonging to projects
   - Each task belongs to a project (`project_id` foreign key)
@@ -73,6 +73,7 @@ App.tsx
     ├── NotesModal.tsx (add notes to project)
     ├── OverviewModal.tsx (mobile-only mini grid view)
     ├── TaskOverviewModal.tsx (cross-board task summary, all screen sizes)
+    ├── GanttModal.tsx (timeline view, all active projects across boards)
     └── SignInModal.tsx
 ```
 
@@ -85,6 +86,7 @@ App.tsx
 - **Drag-and-drop**: Reorder project tiles and board tabs (desktop only)
 - **Overview button** (mobile only): Shows mini 3x3 grid popup of all tiles for quick reference
 - **Tasks button** (top-right of tab row, signed-in users only): Opens TaskOverviewModal to browse all to-do or in-progress tasks across every board
+- **Timeline button** (BarChart2 icon, left of Tasks button, signed-in users only): Opens GanttModal showing all active projects across boards on a timeline
 
 ### Visual Indicators
 
@@ -164,6 +166,24 @@ When the TaskModal closes, always reload projects to update task indicators:
 - Projects occupy specific positions (0-8) in the 3x3 grid
 - Empty cells show "Add Project" button
 - Grid is rendered by creating array of 9 positions and mapping projects by their `position` field
+
+### GanttModal (Timeline View)
+
+- File: `src/components/GanttModal.tsx`
+- Accessible via the Timeline button (BarChart2 icon) left of the Tasks button — signed-in users only
+- Shows all active (non-completed) projects across every board on a horizontal timeline
+- **Two-tier header**: months (darker separators) + ISO week numbers 1–52 (lighter separators)
+- **Range**: May 1 of current year → May 1 of next year; starts on the first Monday on/after May 1
+- Bars use project tile color + glow; tooltip on hover shows date range
+- Today line (red) runs through all rows; current week highlighted in header
+- Add/Edit via bottom form: project dropdown + date pickers; × button to remove from timeline
+- Requires Supabase migration:
+  ```sql
+  ALTER TABLE projects
+    ADD COLUMN IF NOT EXISTS start_date date,
+    ADD COLUMN IF NOT EXISTS end_date date;
+  ```
+- Uses `select('*')` so modal loads projects even before migration; save shows inline error if columns are missing
 
 ## Supabase Configuration
 

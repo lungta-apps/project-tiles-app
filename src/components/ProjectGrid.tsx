@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, BarChart2 } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import NotesModal from './NotesModal';
 import KanbanView from './KanbanView';
 import OverviewModal from './OverviewModal';
 import TaskOverviewModal from './TaskOverviewModal';
+import GanttModal from './GanttModal';
 import MobileProjectCarousel from './MobileProjectCarousel';
 import { supabase, type Project, type Board } from '../lib/supabase';
 import AuthPanel from "@/components/AuthPanel";
@@ -123,6 +124,7 @@ export default function ProjectGrid({
   const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   const [showTaskOverview, setShowTaskOverview] = useState(false);
+  const [showGantt, setShowGantt] = useState(false);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
@@ -556,12 +558,21 @@ export default function ProjectGrid({
           </button>
           </div>
           {user && (
-            <button
-              onClick={() => setShowTaskOverview(true)}
-              className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex-shrink-0"
-            >
-              Tasks
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => setShowGantt(true)}
+                className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex items-center gap-1.5"
+              >
+                <BarChart2 size={14} />
+                Timeline
+              </button>
+              <button
+                onClick={() => setShowTaskOverview(true)}
+                className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap"
+              >
+                Tasks
+              </button>
+            </div>
           )}
         </div>
 
@@ -650,6 +661,12 @@ export default function ProjectGrid({
       <TaskOverviewModal
         isOpen={showTaskOverview}
         onClose={() => setShowTaskOverview(false)}
+        boards={boards}
+      />
+
+      <GanttModal
+        isOpen={showGantt}
+        onClose={() => setShowGantt(false)}
         boards={boards}
       />
 
