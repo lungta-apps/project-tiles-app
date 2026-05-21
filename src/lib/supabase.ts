@@ -17,6 +17,8 @@ export interface Project {
   completed?: boolean;
   notes?: string;
   tasks?: Task[];
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface Board {
