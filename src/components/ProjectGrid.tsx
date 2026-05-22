@@ -485,7 +485,7 @@ export default function ProjectGrid({
           )}
         </div>
 
-        <div className="mb-4 flex items-center gap-3">
+        <div className={`mb-4 flex gap-3 ${isMobile ? 'flex-col' : 'items-center'}`}>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide flex-1 min-w-0">
           {boards.map((board) => (
             <button

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Plus, Pencil } from 'lucide-react';
 import { supabase, type Board } from '../lib/supabase';
 
@@ -111,6 +111,95 @@ function fmtDate(dateStr: string): string {
   });
 }
 
+function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [year, setYear] = useState('');
+  const [month, setMonth] = useState('');
+  const [day, setDay] = useState('');
+  const yearRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const lastEmitted = useRef('');
+
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    const p = value ? value.split('-') : ['', '', ''];
+    setYear(p[0] || '');
+    setMonth(p[1] || '');
+    setDay(p[2] || '');
+    lastEmitted.current = value;
+  }, [value]);
+
+  const emit = (y: string, m: string, d: string) => {
+    if (y.length === 4 && m.length === 2 && d.length === 2) {
+      const dateStr = `${y}-${m}-${d}`;
+      lastEmitted.current = dateStr;
+      onChange(dateStr);
+    } else {
+      lastEmitted.current = '';
+      onChange('');
+    }
+  };
+
+  return (
+    <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 gap-0.5 focus-within:border-zinc-500 transition-colors">
+      <input
+        ref={yearRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="YYYY"
+        maxLength={4}
+        value={year}
+        onChange={(e) => {
+          const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+          setYear(v);
+          if (v.length === 4) monthRef.current?.focus();
+          emit(v, month, day);
+        }}
+        className="w-10 bg-transparent text-white text-sm text-center focus:outline-none placeholder-zinc-600"
+      />
+      <span className="text-zinc-600 text-sm select-none">-</span>
+      <input
+        ref={monthRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="MM"
+        maxLength={2}
+        value={month}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, '').slice(0, 2);
+          const num = parseInt(raw, 10);
+          const advance = raw.length === 2 || (raw.length === 1 && num >= 2);
+          const v = advance && raw.length === 1 ? raw.padStart(2, '0') : raw;
+          setMonth(v);
+          if (advance) dayRef.current?.focus();
+          emit(year, v, day);
+        }}
+        onKeyDown={(e) => { if (e.key === 'Backspace' && month === '') yearRef.current?.focus(); }}
+        className="w-7 bg-transparent text-white text-sm text-center focus:outline-none placeholder-zinc-600"
+      />
+      <span className="text-zinc-600 text-sm select-none">-</span>
+      <input
+        ref={dayRef}
+        type="text"
+        inputMode="numeric"
+        placeholder="DD"
+        maxLength={2}
+        value={day}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, '').slice(0, 2);
+          const num = parseInt(raw, 10);
+          const advance = raw.length === 2 || (raw.length === 1 && num >= 4);
+          const v = advance && raw.length === 1 ? raw.padStart(2, '0') : raw;
+          setDay(v);
+          emit(year, month, v);
+        }}
+        onKeyDown={(e) => { if (e.key === 'Backspace' && day === '') monthRef.current?.focus(); }}
+        className="w-7 bg-transparent text-white text-sm text-center focus:outline-none placeholder-zinc-600"
+      />
+    </div>
+  );
+}
+
 export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps) {
   const [allProjects, setAllProjects] = useState<GanttProject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -188,6 +277,13 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
     })();
     return () => { cancelled = true; };
   }, [isOpen, boards]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
 
   const openAdd = () => {
     setEditingId('new');
@@ -269,7 +365,7 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
     >
       <div
         className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-7xl flex flex-col"
-        style={{ height: 'calc(100vh - 2rem)', maxHeight: 'calc(100vh - 2rem)' }}
+        style={{ height: 'calc(100dvh - 2rem)', maxHeight: 'calc(100dvh - 2rem)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -287,7 +383,7 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
               Loading...
             </div>
           ) : (
-            <div className="h-full overflow-auto">
+            <div className="h-full overflow-auto" style={{ overscrollBehavior: 'contain' }}>
               <div style={{ minWidth: LEFT_W + totalW }}>
 
                 {/* Month header — sticky top */}
@@ -496,19 +592,9 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
                   {allProjects.find((p) => p.id === editingId)?.name}
                 </span>
               )}
-              <input
-                type="date"
-                value={formStart}
-                onChange={(e) => setFormStart(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-zinc-500"
-              />
+              <DateInput value={formStart} onChange={setFormStart} />
               <span className="text-zinc-500 text-sm">→</span>
-              <input
-                type="date"
-                value={formEnd}
-                onChange={(e) => setFormEnd(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-zinc-500"
-              />
+              <DateInput value={formEnd} onChange={setFormEnd} />
               <button
                 onClick={handleSave}
                 disabled={!canSave}

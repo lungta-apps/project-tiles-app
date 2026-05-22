@@ -88,6 +88,12 @@ App.tsx
 - **Tasks button** (top-right of tab row, signed-in users only): Opens TaskOverviewModal to browse all to-do or in-progress tasks across every board
 - **Timeline button** (BarChart2 icon, left of Tasks button, signed-in users only): Opens GanttModal showing all active projects across boards on a timeline
 
+### Mobile Layout Notes
+
+- **Tab row**: on mobile (`isMobile = true`, width < 768px), the Timeline and Tasks buttons render on a second row below the board tabs (`flex-col`) to avoid crowding in portrait mode. On desktop/landscape they remain on the same row.
+- **Mobile carousel — portrait**: 1 tile per page, 9 dots, "N of 9" counter
+- **Mobile carousel — landscape**: 3 tiles per page side-by-side (180px tall), 3 dots, "Page N of 3" counter; orientation detected via `window.innerWidth > window.innerHeight` with a resize listener
+
 ### Visual Indicators
 
 - **Yellow dot** (top-right of tile, left position): Indicates project has notes
@@ -176,7 +182,9 @@ When the TaskModal closes, always reload projects to update task indicators:
 - **Range**: May 1 of current year → May 1 of next year; starts on the first Monday on/after May 1
 - Bars use project tile color + glow; tooltip on hover shows date range
 - Today line (red) runs through all rows; current week highlighted in header
-- Add/Edit via bottom form: project dropdown + date pickers; × button to remove from timeline
+- Add/Edit via bottom form: project dropdown + custom date inputs (YYYY-MM-DD); × button to remove from timeline
+- **Date input**: custom `DateInput` component (defined in `GanttModal.tsx`) — three text fields (YYYY / MM / DD) with auto-advance: year→month after 4 digits, month→day after 2 digits or a single digit ≥ 2, day auto-pads on single digit ≥ 4; Backspace in empty field returns focus to previous field
+- **Mobile**: body scroll lock (`document.body.style.overflow = 'hidden'`) while open; height uses `100dvh` (not `100vh`) to account for mobile browser chrome; `overscroll-behavior: contain` on the chart scroll area prevents background scroll-through
 - Requires Supabase migration:
   ```sql
   ALTER TABLE projects
