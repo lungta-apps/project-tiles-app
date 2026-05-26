@@ -125,6 +125,8 @@ export default function ProjectGrid({
   const [showOverview, setShowOverview] = useState(false);
   const [showTaskOverview, setShowTaskOverview] = useState(false);
   const [showGantt, setShowGantt] = useState(false);
+  const [ganttScopePicker, setGanttScopePicker] = useState(false);
+  const [ganttBoardId, setGanttBoardId] = useState<string | null>(null);
   const [draggedBoardId, setDraggedBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [activeDragPosition, setActiveDragPosition] = useState<number | null>(null);
@@ -228,7 +230,7 @@ export default function ProjectGrid({
     }
   };
 
-  const handleAddProject = async (name: string, color: string) => {
+  const handleAddProject = async (name: string, color: string, _targetBoardId?: string) => {
     try {
       const targetPosition = pendingPosition ?? projects.length;
       if (targetPosition >= 9) {
@@ -276,14 +278,36 @@ export default function ProjectGrid({
     }
   };
 
-  const handleUpdateProject = async (name: string, color: string) => {
+  const handleUpdateProject = async (name: string, color: string, targetBoardId?: string) => {
     if (!editingProject) return;
     try {
-      const { error } = await supabase
-        .from('projects')
-        .update({ name, color, updated_at: new Date().toISOString() })
-        .eq('id', editingProject.id);
-      if (error) throw error;
+      const isMoving = targetBoardId && targetBoardId !== currentBoardId;
+
+      if (isMoving) {
+        const { data: targetProjects } = await supabase
+          .from('projects')
+          .select('position')
+          .eq('board_id', targetBoardId);
+        const usedPositions = new Set(targetProjects?.map((p) => p.position) ?? []);
+        let newPosition = 0;
+        while (usedPositions.has(newPosition) && newPosition < 9) newPosition++;
+        if (newPosition >= 9) {
+          alert(`The target board is full (9 projects max).`);
+          return;
+        }
+        const { error } = await supabase
+          .from('projects')
+          .update({ name, color, board_id: targetBoardId, position: newPosition, updated_at: new Date().toISOString() })
+          .eq('id', editingProject.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('projects')
+          .update({ name, color, updated_at: new Date().toISOString() })
+          .eq('id', editingProject.id);
+        if (error) throw error;
+      }
+
       await loadProjects(currentBoardId);
       setIsModalOpen(false);
       setEditingProject(null);
@@ -559,13 +583,45 @@ export default function ProjectGrid({
           </div>
           {user && (
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setShowGantt(true)}
-                className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex items-center gap-1.5"
-              >
-                <BarChart2 size={14} />
-                Timeline
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setGanttScopePicker((p) => !p)}
+                  className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap flex items-center gap-1.5"
+                >
+                  <BarChart2 size={14} />
+                  Timeline
+                </button>
+                {ganttScopePicker && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setGanttScopePicker(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[180px]">
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                        onClick={() => {
+                          setGanttBoardId(currentBoardId);
+                          setGanttScopePicker(false);
+                          setShowGantt(true);
+                        }}
+                      >
+                        This board
+                        <span className="block text-xs text-zinc-500 mt-0.5">
+                          {boards.find((b) => b.id === currentBoardId)?.name ?? ''}
+                        </span>
+                      </button>
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                        onClick={() => {
+                          setGanttBoardId(null);
+                          setGanttScopePicker(false);
+                          setShowGantt(true);
+                        }}
+                      >
+                        All boards
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => setShowTaskOverview(true)}
                 className="px-3 py-1 rounded border border-zinc-600 text-zinc-300 hover:bg-zinc-800 text-sm whitespace-nowrap"
@@ -655,6 +711,8 @@ export default function ProjectGrid({
         initialColor={editingProject?.color}
         initialName={editingProject?.name}
         title={editingProject ? 'Edit Project' : 'Add New Project'}
+        boards={editingProject ? boards : undefined}
+        currentBoardId={editingProject ? currentBoardId : undefined}
       />
       <SignInModal isOpen={showSignInModal} onClose={() => setShowSignInModal(false)} />
 
@@ -668,6 +726,7 @@ export default function ProjectGrid({
         isOpen={showGantt}
         onClose={() => setShowGantt(false)}
         boards={boards}
+        boardId={ganttBoardId}
       />
 
       {selectedProjectForTasks && (

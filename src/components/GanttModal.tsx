@@ -36,6 +36,7 @@ interface GanttModalProps {
   isOpen: boolean;
   onClose: () => void;
   boards: Board[];
+  boardId?: string | null;
 }
 
 function firstMondayOnOrAfter(d: Date): Date {
@@ -95,10 +96,13 @@ function buildMonthGroups(weeks: WeekEntry[]): MonthGroup[] {
   return groups;
 }
 
-function weekIndexFor(dateStr: string, weeks: WeekEntry[]): number {
+function dayPixelOffset(dateStr: string, weeks: WeekEntry[]): number {
   const target = new Date(dateStr + 'T00:00:00');
   for (let i = weeks.length - 1; i >= 0; i--) {
-    if (target >= weeks[i].monday) return i;
+    if (target >= weeks[i].monday) {
+      const dayOfWeek = (target.getDay() + 6) % 7; // Mon=0 … Sun=6
+      return i * WEEK_W + (dayOfWeek / 7) * WEEK_W;
+    }
   }
   return 0;
 }
@@ -200,7 +204,7 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps) {
+export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttModalProps) {
   const [allProjects, setAllProjects] = useState<GanttProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
@@ -249,10 +253,11 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
     setLoading(true);
     (async () => {
       try {
+        const boardIds = boardId ? [boardId] : boards.map((b) => b.id);
         const { data, error } = await supabase
           .from('projects')
           .select('*')
-          .in('board_id', boards.map((b) => b.id))
+          .in('board_id', boardIds)
           .or('completed.is.null,completed.eq.false')
           .order('name', { ascending: true });
         if (error) throw error;
@@ -276,7 +281,7 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
       }
     })();
     return () => { cancelled = true; };
-  }, [isOpen, boards]);
+  }, [isOpen, boards, boardId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -370,7 +375,14 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
-          <h2 className="text-white text-lg font-semibold">Timeline</h2>
+          <h2 className="text-white text-lg font-semibold">
+            Timeline
+            {boardId && (
+              <span className="ml-2 text-sm font-normal text-zinc-400">
+                — {boards.find((b) => b.id === boardId)?.name ?? 'This Board'}
+              </span>
+            )}
+          </h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
@@ -454,10 +466,10 @@ export default function GanttModal({ isOpen, onClose, boards }: GanttModalProps)
                   </div>
                 ) : (
                   scheduled.map((project) => {
-                    const startIdx = weekIndexFor(project.start_date!, weeks);
-                    const endIdx = weekIndexFor(project.end_date!, weeks);
-                    const barLeft = startIdx * WEEK_W + 2;
-                    const barWidth = Math.max((endIdx - startIdx + 1) * WEEK_W - 4, WEEK_W - 4);
+                    const startPx = dayPixelOffset(project.start_date!, weeks);
+                    const endPx = dayPixelOffset(project.end_date!, weeks) + WEEK_W / 7;
+                    const barLeft = startPx + 2;
+                    const barWidth = Math.max(endPx - startPx - 4, WEEK_W / 7);
                     const isEditing = editingId === project.id;
 
                     return (

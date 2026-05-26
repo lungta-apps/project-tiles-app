@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { COLORS } from "@/constants/colors";
+import type { Board } from '@/lib/supabase';
 
 
 interface AddProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (name: string, color: string) => void;
+  onAdd: (name: string, color: string, targetBoardId?: string) => void;
   initialColor?: string;
   initialName?: string;
   title?: string;
+  boards?: Board[];
+  currentBoardId?: string | null;
 }
 
 export default function AddProjectModal({
@@ -18,18 +21,22 @@ export default function AddProjectModal({
   initialColor = '#3B82F6',
   initialName = '',
   title = 'Add New Project',
+  boards,
+  currentBoardId,
 }: AddProjectModalProps) {
   const [projectName, setProjectName] = useState(initialName);
   const [selectedColor, setSelectedColor] = useState(initialColor);
+  const [targetBoardId, setTargetBoardId] = useState(currentBoardId ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setProjectName(initialName);
       setSelectedColor(initialColor);
+      setTargetBoardId(currentBoardId ?? '');
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen, initialColor, initialName]);
+  }, [isOpen, initialColor, initialName, currentBoardId]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -45,7 +52,7 @@ export default function AddProjectModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (projectName.trim()) {
-      onAdd(projectName.trim(), selectedColor);
+      onAdd(projectName.trim(), selectedColor, targetBoardId || undefined);
       setProjectName('');
       setSelectedColor('#3B82F6');
     }
@@ -111,6 +118,26 @@ export default function AddProjectModal({
               ))}
             </div>
           </div>
+
+          {boards && boards.length > 1 && (
+            <div className="mb-6">
+              <label htmlFor="target-board" className="block text-sm font-medium text-zinc-300 mb-2">
+                Board
+              </label>
+              <select
+                id="target-board"
+                value={targetBoardId}
+                onChange={(e) => setTargetBoardId(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {boards.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}{b.id === currentBoardId ? ' (current)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <button
