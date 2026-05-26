@@ -80,13 +80,14 @@ App.tsx
 ### Key Interactions
 
 - **Long press** (500ms) on project tile: Shows context menu (Edit Project, Mark Completed, Tasks, Notes, Delete)
+  - **Edit Project**: opens AddProjectModal with name + color fields; when >1 board exists also shows a **Board** dropdown pre-set to the current board — changing it moves the project to the first available slot on the target board (alerts if full)
 - **Double-click** on project tile: Opens task modal
 - **Double-tap/double-click** on board tab: Opens a menu with Rename and Delete options
 - **Click** empty grid cell: Opens add project modal (shows sign-in modal if not authenticated)
 - **Drag-and-drop**: Reorder project tiles and board tabs (desktop only)
 - **Overview button** (mobile only): Shows mini 3x3 grid popup of all tiles for quick reference
 - **Tasks button** (top-right of tab row, signed-in users only): Opens TaskOverviewModal to browse all to-do or in-progress tasks across every board
-- **Timeline button** (BarChart2 icon, left of Tasks button, signed-in users only): Opens GanttModal showing all active projects across boards on a timeline
+- **Timeline button** (BarChart2 icon, left of Tasks button, signed-in users only): Clicking opens a small scope picker dropdown — "This board" (filters to current board) or "All boards" (shows everything). Opens GanttModal with the chosen scope.
 
 ### Mobile Layout Notes
 
@@ -177,9 +178,11 @@ When the TaskModal closes, always reload projects to update task indicators:
 
 - File: `src/components/GanttModal.tsx`
 - Accessible via the Timeline button (BarChart2 icon) left of the Tasks button — signed-in users only
-- Shows all active (non-completed) projects across every board on a horizontal timeline
+- **Scope picker**: clicking Timeline shows a dropdown with "This board" (current board name shown as subtitle) or "All boards"; passes `boardId` prop to GanttModal to filter accordingly; modal header shows "Timeline — [Board Name]" when filtered
+- Shows all active (non-completed) projects on a horizontal timeline
 - **Two-tier header**: months (darker separators) + ISO week numbers 1–52 (lighter separators)
 - **Range**: May 1 of current year → May 1 of next year; starts on the first Monday on/after May 1
+- **Bar positioning**: day-level precision via `dayPixelOffset()` — bars land on the exact calendar day, not snapped to week boundaries. End date is inclusive (+1 day width). Adjacent projects sharing a boundary date touch but don't overlap.
 - Bars use project tile color + glow; tooltip on hover shows date range
 - Today line (red) runs through all rows; current week highlighted in header
 - Add/Edit via bottom form: project dropdown + custom date inputs (YYYY-MM-DD); × button to remove from timeline
