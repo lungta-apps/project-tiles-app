@@ -180,14 +180,15 @@ When the TaskModal closes, always reload projects to update task indicators:
 - Accessible via the Timeline button (BarChart2 icon) left of the Tasks button — signed-in users only
 - **Scope picker**: clicking Timeline shows a dropdown with "This board" (current board name shown as subtitle) or "All boards"; passes `boardId` prop to GanttModal to filter accordingly; modal header shows "Timeline — [Board Name]" when filtered
 - Shows all active (non-completed) projects on a horizontal timeline
-- **Two-tier header**: months (darker separators) + ISO week numbers 1–52 (lighter separators)
+- **Header**: single row of month labels only (week number row removed). Month boundaries use `buildMonthSections()` which calls `dayPixelOffset('YYYY-MM-01', weeks)` for day-level precision — the Sep/Oct separator lands at the exact pixel of Oct 1, not snapped to the nearest Monday. `MonthSection` type has `left` + `width` (pixels); `WEEK_H` constant removed.
 - **Range**: May 1 of current year → May 1 of next year; starts on the first Monday on/after May 1
 - **Bar positioning**: day-level precision via `dayPixelOffset()` — bars land on the exact calendar day, not snapped to week boundaries. End date is inclusive (+1 day width). Adjacent projects sharing a boundary date touch but don't overlap.
 - Bars use project tile color + glow; tooltip on hover shows date range
-- Today line (red) runs through all rows; current week highlighted in header
-- Add/Edit via bottom form: project dropdown + custom date inputs (YYYY-MM-DD); × button to remove from timeline
+- Today line (red) runs through all rows
+- **Add button**: `+` icon in the modal header (left of `×`), both styled as `w-9 h-9 rounded-full bg-zinc-800 border border-zinc-600` circles. `+` is disabled when no unscheduled projects exist or the edit form is already open. The date-picker form only appears at the bottom when actively adding/editing — no persistent bottom bar.
 - **Date input**: custom `DateInput` component (defined in `GanttModal.tsx`) — three text fields (YYYY / MM / DD) with auto-advance: year→month after 4 digits, month→day after 2 digits or a single digit ≥ 2, day auto-pads on single digit ≥ 4; Backspace in empty field returns focus to previous field
-- **Mobile**: body scroll lock (`document.body.style.overflow = 'hidden'`) while open; height uses `100dvh` (not `100vh`) to account for mobile browser chrome; `overscroll-behavior: contain` on the chart scroll area prevents background scroll-through
+- **Modal layout**: outer overlay uses inline `env(safe-area-inset-*)` padding (min 0.75rem) instead of Tailwind `p-4`; inner modal uses `height: 100%` + `min-w-0 overflow-hidden` to prevent the chart's wide `minWidth` from inflating the flex column and clipping off-screen on tablets
+- **Mobile**: body scroll lock (`document.body.style.overflow = 'hidden'`) while open; height adapts via `100%` of the safe-area-padded container; `overscroll-behavior: contain` on the chart scroll area prevents background scroll-through
 - Requires Supabase migration:
   ```sql
   ALTER TABLE projects

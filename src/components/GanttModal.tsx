@@ -6,7 +6,6 @@ const WEEK_W = 44;
 const LEFT_W = 192;
 const ROW_H = 52;
 const MONTH_H = 32;
-const WEEK_H = 28;
 
 interface GanttProject {
   id: string;
@@ -25,11 +24,11 @@ interface WeekEntry {
   monthLabel: string;
 }
 
-interface MonthGroup {
+interface MonthSection {
   key: string;
   label: string;
-  startIdx: number;
-  count: number;
+  left: number;
+  width: number;
 }
 
 interface GanttModalProps {
@@ -83,17 +82,30 @@ function buildWeeks(): WeekEntry[] {
   return weeks;
 }
 
-function buildMonthGroups(weeks: WeekEntry[]): MonthGroup[] {
-  const groups: MonthGroup[] = [];
-  weeks.forEach((w, i) => {
-    const last = groups[groups.length - 1];
-    if (last && last.key === w.monthKey) {
-      last.count++;
-    } else {
-      groups.push({ key: w.monthKey, label: w.monthLabel, startIdx: i, count: 1 });
-    }
-  });
-  return groups;
+function buildMonthSections(weeks: WeekEntry[]): MonthSection[] {
+  if (weeks.length === 0) return [];
+  const totalW = weeks.length * WEEK_W;
+  const rangeEnd = new Date(weeks[weeks.length - 1].monday.getTime() + 7 * 86400000);
+
+  const pts: { key: string; label: string; left: number }[] = [];
+  let cur = new Date(weeks[0].monday.getFullYear(), weeks[0].monday.getMonth(), 1);
+
+  while (cur < rangeEnd) {
+    const yr = cur.getFullYear();
+    const mo = cur.getMonth();
+    const key = `${yr}-${String(mo + 1).padStart(2, '0')}`;
+    const label = cur.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    const dateStr = `${yr}-${String(mo + 1).padStart(2, '0')}-01`;
+    // First section clamps to 0 — chart starts at first Monday which may be after the 1st
+    const left = pts.length === 0 ? 0 : dayPixelOffset(dateStr, weeks);
+    pts.push({ key, label, left });
+    cur = new Date(yr, mo + 1, 1);
+  }
+
+  return pts.map((s, i) => ({
+    ...s,
+    width: i < pts.length - 1 ? pts[i + 1].left - s.left : totalW - s.left,
+  }));
 }
 
 function dayPixelOffset(dateStr: string, weeks: WeekEntry[]): number {
@@ -216,7 +228,7 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const weeks = useMemo(() => buildWeeks(), []);
-  const monthGroups = useMemo(() => buildMonthGroups(weeks), [weeks]);
+  const monthSections = useMemo(() => buildMonthSections(weeks), [weeks]);
   const totalW = weeks.length * WEEK_W;
 
   const todayMidnight = useMemo(() => {
@@ -365,12 +377,18 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      style={{
+        paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
+        paddingRight: 'max(0.75rem, env(safe-area-inset-right))',
+      }}
       onClick={onClose}
     >
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-7xl flex flex-col"
-        style={{ height: 'calc(100dvh - 2rem)', maxHeight: 'calc(100dvh - 2rem)' }}
+        className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-7xl flex flex-col min-w-0 overflow-hidden"
+        style={{ height: '100%', maxHeight: '100%' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -383,13 +401,26 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
               </span>
             )}
           </h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openAdd}
+              disabled={unscheduled.length === 0 || editingId !== null}
+              className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Add project to timeline"
+            >
+              <Plus size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-all"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Chart */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden min-w-0">
           {loading ? (
             <div className="flex items-center justify-center h-32 text-zinc-500 text-sm">
               Loading...
@@ -410,11 +441,11 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                     <span className="text-zinc-500 text-xs font-medium">Project</span>
                   </div>
                   <div className="relative flex-shrink-0" style={{ width: totalW, height: MONTH_H }}>
-                    {monthGroups.map((m) => (
+                    {monthSections.map((m) => (
                       <div
                         key={m.key}
                         className="absolute top-0 bottom-0 flex items-center px-2 overflow-hidden border-r-2 border-zinc-600"
-                        style={{ left: m.startIdx * WEEK_W, width: m.count * WEEK_W }}
+                        style={{ left: m.left, width: m.width }}
                       >
                         <span className="text-zinc-300 text-xs font-semibold whitespace-nowrap">
                           {m.label}
@@ -424,40 +455,6 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                   </div>
                 </div>
 
-                {/* Week header — sticky below months */}
-                <div
-                  className="flex sticky z-20 bg-zinc-900 border-b border-zinc-700"
-                  style={{ top: MONTH_H, height: WEEK_H }}
-                >
-                  <div
-                    className="sticky left-0 z-30 bg-zinc-900 border-r border-zinc-700 flex-shrink-0"
-                    style={{ width: LEFT_W }}
-                  />
-                  <div className="relative flex-shrink-0" style={{ width: totalW, height: WEEK_H }}>
-                    {weeks.map((w, i) => {
-                      const isCurrent = todayOffset >= i * WEEK_W && todayOffset < (i + 1) * WEEK_W;
-                      return (
-                        <div
-                          key={i}
-                          className={`absolute top-0 bottom-0 flex items-center justify-center border-r border-zinc-800 ${isCurrent ? 'bg-zinc-800' : ''}`}
-                          style={{ left: i * WEEK_W, width: WEEK_W }}
-                        >
-                          <span
-                            className={`text-[10px] ${isCurrent ? 'text-zinc-200 font-bold' : 'text-zinc-600'}`}
-                          >
-                            {w.isoWeek}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {todayOffset >= 0 && (
-                      <div
-                        className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 pointer-events-none z-10"
-                        style={{ left: todayOffset }}
-                      />
-                    )}
-                  </div>
-                </div>
 
                 {/* Project rows */}
                 {scheduled.length === 0 ? (
@@ -521,12 +518,12 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                             />
                           ))}
                           {/* Month separator lines */}
-                          {monthGroups.map((m, i) =>
+                          {monthSections.map((m, i) =>
                             i > 0 ? (
                               <div
                                 key={m.key}
                                 className="absolute top-0 bottom-0 w-px bg-zinc-700 pointer-events-none"
-                                style={{ left: m.startIdx * WEEK_W }}
+                                style={{ left: m.left }}
                               />
                             ) : null
                           )}
@@ -574,18 +571,9 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
           )}
         </div>
 
-        {/* Add / Edit form */}
-        <div className="flex-shrink-0 border-t border-zinc-800 px-4 py-3">
-          {editingId === null ? (
-            <button
-              onClick={openAdd}
-              disabled={unscheduled.length === 0}
-              className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <Plus size={15} />
-              Add Project to Timeline
-            </button>
-          ) : (
+        {/* Edit form — only shown when adding/editing */}
+        {editingId !== null && (
+          <div className="flex-shrink-0 border-t border-zinc-800 px-4 py-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-center gap-3 flex-wrap">
               {editingId === 'new' ? (
                 <select
@@ -624,8 +612,8 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                 <span className="text-red-400 text-xs">{saveError}</span>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Tooltip */}
