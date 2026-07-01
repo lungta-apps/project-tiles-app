@@ -185,17 +185,31 @@ When the TaskModal closes, always reload projects to update task indicators:
 - **Bar positioning**: day-level precision via `dayPixelOffset()` — bars land on the exact calendar day, not snapped to week boundaries. End date is inclusive (+1 day width). Adjacent projects sharing a boundary date touch but don't overlap.
 - Bars use project tile color + glow; tooltip on hover shows date range
 - Today line (red) runs through all rows
-- **Add button**: `+` icon in the modal header (left of `×`), both styled as `w-9 h-9 rounded-full bg-zinc-800 border border-zinc-600` circles. `+` is disabled when no unscheduled projects exist or the edit form is already open. The date-picker form only appears at the bottom when actively adding/editing — no persistent bottom bar.
+- **Add button**: `+` icon in the modal header (left of `×`), both styled as `w-9 h-9 rounded-full bg-zinc-800 border border-zinc-600` circles. `+` is disabled when no unscheduled projects exist or any edit form is already open (`isEditingAny = editingId !== null || editingTaskId !== null`). The date-picker form only appears at the bottom when actively adding/editing — no persistent bottom bar.
 - **Date input**: custom `DateInput` component (defined in `GanttModal.tsx`) — three text fields (YYYY / MM / DD) with auto-advance: year→month after 4 digits, month→day after 2 digits or a single digit ≥ 2, day auto-pads on single digit ≥ 4; Backspace in empty field returns focus to previous field
 - **Modal layout**: outer overlay uses inline `env(safe-area-inset-*)` padding (min 0.75rem) instead of Tailwind `p-4`; inner modal uses `height: 100%` + `min-w-0 overflow-hidden` to prevent the chart's wide `minWidth` from inflating the flex column and clipping off-screen on tablets
 - **Mobile**: body scroll lock (`document.body.style.overflow = 'hidden'`) while open; height adapts via `100%` of the safe-area-padded container; `overscroll-behavior: contain` on the chart scroll area prevents background scroll-through
-- Requires Supabase migration:
+- **Name column width**: `LEFT_W = 240` (px) — sticky left column for project/task names
+- **Sub-timelines (task rows)**:
+  - Project rows with tasks show a `ChevronRight` toggle (left of color dot); clicking expands/collapses task sub-rows. Rows without tasks show a spacer instead.
+  - Expanded task sub-rows are `TASK_ROW_H = 36px` tall, indented (`pl-8`), text in `text-zinc-400 text-xs`
+  - Tasks with dates show a bar at same project color + `AA` opacity (67%) with softer glow; tooltip shows task name + date range
+  - Tasks without dates show a `+` button to add dates inline
+  - Pencil/X icons on dated task rows edit or clear task dates
+  - Clicking any task date action opens the shared bottom edit form bound to that task (`editingTaskId` state); saves to `tasks` table
+  - `editingId` (project) and `editingTaskId` (task) are mutually exclusive — opening one closes the other
+  - GanttModal fetches tasks alongside projects on load: `supabase.from('tasks').select('*').in('project_id', projectIds)`, grouped into `tasksByProject: Record<string, GanttTask[]>`
+- Requires Supabase migrations:
   ```sql
   ALTER TABLE projects
     ADD COLUMN IF NOT EXISTS start_date date,
     ADD COLUMN IF NOT EXISTS end_date date;
+
+  ALTER TABLE tasks
+    ADD COLUMN IF NOT EXISTS start_date date,
+    ADD COLUMN IF NOT EXISTS end_date date;
   ```
-- Uses `select('*')` so modal loads projects even before migration; save shows inline error if columns are missing
+- Uses `select('*')` so modal loads even before migration; save shows inline error if columns are missing
 
 ## Supabase Configuration
 

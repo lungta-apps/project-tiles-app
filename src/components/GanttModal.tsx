@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Plus, Pencil } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Plus, Pencil, ChevronRight } from 'lucide-react';
 import { supabase, type Board } from '../lib/supabase';
 
 const WEEK_W = 44;
-const LEFT_W = 192;
+const LEFT_W = 240;
 const ROW_H = 52;
+const TASK_ROW_H = 36;
 const MONTH_H = 32;
 
 interface GanttProject {
@@ -13,6 +14,15 @@ interface GanttProject {
   color: string;
   board_id: string;
   boardName: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+interface GanttTask {
+  id: string;
+  project_id: string;
+  description: string;
+  status: 'todo' | 'in_progress' | 'done';
   start_date: string | null;
   end_date: string | null;
 }
@@ -96,7 +106,6 @@ function buildMonthSections(weeks: WeekEntry[]): MonthSection[] {
     const key = `${yr}-${String(mo + 1).padStart(2, '0')}`;
     const label = cur.toLocaleString('en-US', { month: 'short', year: 'numeric' });
     const dateStr = `${yr}-${String(mo + 1).padStart(2, '0')}-01`;
-    // First section clamps to 0 — chart starts at first Monday which may be after the 1st
     const left = pts.length === 0 ? 0 : dayPixelOffset(dateStr, weeks);
     pts.push({ key, label, left });
     cur = new Date(yr, mo + 1, 1);
@@ -218,8 +227,13 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
 
 export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttModalProps) {
   const [allProjects, setAllProjects] = useState<GanttProject[]>([]);
+  const [tasksByProject, setTasksByProject] = useState<Record<string, GanttTask[]>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+
+  // Editing state — only one of editingId (project) or editingTaskId (task) is non-null at a time
   const [editingId, setEditingId] = useState<string | 'new' | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [formProjectId, setFormProjectId] = useState('');
   const [formStart, setFormStart] = useState('');
   const [formEnd, setFormEnd] = useState('');
@@ -249,14 +263,18 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
 
   const scheduled = allProjects.filter((p) => p.start_date && p.end_date);
   const unscheduled = allProjects.filter((p) => !p.start_date || !p.end_date);
+  const isEditingAny = editingId !== null || editingTaskId !== null;
 
   useEffect(() => {
     if (!isOpen) {
       setEditingId(null);
+      setEditingTaskId(null);
       setFormProjectId('');
       setFormStart('');
       setFormEnd('');
       setAllProjects([]);
+      setTasksByProject({});
+      setExpandedProjects(new Set());
       return;
     }
     if (boards.length === 0) return;
@@ -273,18 +291,42 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
           .or('completed.is.null,completed.eq.false')
           .order('name', { ascending: true });
         if (error) throw error;
+
+        const projects = (data ?? []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          board_id: p.board_id,
+          boardName: boards.find((b) => b.id === p.board_id)?.name ?? '',
+          start_date: p.start_date ?? null,
+          end_date: p.end_date ?? null,
+        }));
+
+        // Fetch tasks for all loaded projects
+        const projectIds = projects.map((p) => p.id);
+        const taskMap: Record<string, GanttTask[]> = {};
+        if (projectIds.length > 0) {
+          const { data: tasksData } = await supabase
+            .from('tasks')
+            .select('*')
+            .in('project_id', projectIds)
+            .order('position', { ascending: true });
+          (tasksData ?? []).forEach((t) => {
+            if (!taskMap[t.project_id]) taskMap[t.project_id] = [];
+            taskMap[t.project_id].push({
+              id: t.id,
+              project_id: t.project_id,
+              description: t.description,
+              status: t.status,
+              start_date: t.start_date ?? null,
+              end_date: t.end_date ?? null,
+            });
+          });
+        }
+
         if (!cancelled) {
-          setAllProjects(
-            (data ?? []).map((p) => ({
-              id: p.id,
-              name: p.name,
-              color: p.color,
-              board_id: p.board_id,
-              boardName: boards.find((b) => b.id === p.board_id)?.name ?? '',
-              start_date: p.start_date ?? null,
-              end_date: p.end_date ?? null,
-            }))
-          );
+          setAllProjects(projects);
+          setTasksByProject(taskMap);
         }
       } catch (err) {
         console.error('Gantt fetch error:', err);
@@ -302,17 +344,39 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
+  const toggleExpand = (projectId: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
   const openAdd = () => {
     setEditingId('new');
+    setEditingTaskId(null);
     setFormProjectId(unscheduled[0]?.id ?? '');
     setFormStart('');
     setFormEnd('');
+    setSaveError(null);
   };
 
   const openEdit = (p: GanttProject) => {
     setEditingId(p.id);
+    setEditingTaskId(null);
     setFormStart(p.start_date ?? '');
     setFormEnd(p.end_date ?? '');
+    setSaveError(null);
+  };
+
+  const openEditTask = (task: GanttTask) => {
+    setEditingTaskId(task.id);
+    setEditingId(null);
+    setFormProjectId('');
+    setFormStart(task.start_date ?? '');
+    setFormEnd(task.end_date ?? '');
+    setSaveError(null);
   };
 
   const handleSave = async () => {
@@ -320,17 +384,35 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
     setSaving(true);
     setSaveError(null);
     try {
-      const id = editingId === 'new' ? formProjectId : editingId!;
-      const { error } = await supabase
-        .from('projects')
-        .update({ start_date: formStart, end_date: formEnd, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
-      setAllProjects((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, start_date: formStart, end_date: formEnd } : p))
-      );
-      setEditingId(null);
-      setFormProjectId('');
+      if (editingTaskId) {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ start_date: formStart, end_date: formEnd })
+          .eq('id', editingTaskId);
+        if (error) throw error;
+        setTasksByProject((prev) => {
+          const next = { ...prev };
+          for (const pid of Object.keys(next)) {
+            next[pid] = next[pid].map((t) =>
+              t.id === editingTaskId ? { ...t, start_date: formStart, end_date: formEnd } : t
+            );
+          }
+          return next;
+        });
+        setEditingTaskId(null);
+      } else {
+        const id = editingId === 'new' ? formProjectId : editingId!;
+        const { error } = await supabase
+          .from('projects')
+          .update({ start_date: formStart, end_date: formEnd, updated_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw error;
+        setAllProjects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, start_date: formStart, end_date: formEnd } : p))
+        );
+        setEditingId(null);
+        setFormProjectId('');
+      }
       setFormStart('');
       setFormEnd('');
     } catch (err: unknown) {
@@ -358,8 +440,31 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
     }
   };
 
+  const handleRemoveTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ start_date: null, end_date: null })
+        .eq('id', taskId);
+      if (error) throw error;
+      setTasksByProject((prev) => {
+        const next = { ...prev };
+        for (const pid of Object.keys(next)) {
+          next[pid] = next[pid].map((t) =>
+            t.id === taskId ? { ...t, start_date: null, end_date: null } : t
+          );
+        }
+        return next;
+      });
+      if (editingTaskId === taskId) setEditingTaskId(null);
+    } catch (err) {
+      console.error('Gantt remove task error:', err);
+    }
+  };
+
   const cancelForm = () => {
     setEditingId(null);
+    setEditingTaskId(null);
     setFormProjectId('');
     setFormStart('');
     setFormEnd('');
@@ -373,7 +478,12 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
     !!formEnd &&
     formEnd >= formStart &&
     !saving &&
-    (editingId !== 'new' || !!formProjectId);
+    (editingTaskId !== null || editingId !== 'new' || !!formProjectId);
+
+  // Find the task being edited for its label in the form
+  const editingTask = editingTaskId
+    ? Object.values(tasksByProject).flat().find((t) => t.id === editingTaskId)
+    : null;
 
   return (
     <div
@@ -404,7 +514,7 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
           <div className="flex items-center gap-2">
             <button
               onClick={openAdd}
-              disabled={unscheduled.length === 0 || editingId !== null}
+              disabled={unscheduled.length === 0 || isEditingAny}
               className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               title="Add project to timeline"
             >
@@ -455,7 +565,6 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                   </div>
                 </div>
 
-
                 {/* Project rows */}
                 {scheduled.length === 0 ? (
                   <div className="flex items-center justify-center py-16 text-zinc-600 text-sm">
@@ -468,101 +577,226 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
                     const barLeft = startPx + 2;
                     const barWidth = Math.max(endPx - startPx - 4, WEEK_W / 7);
                     const isEditing = editingId === project.id;
+                    const projectTasks = tasksByProject[project.id] ?? [];
+                    const hasTasks = projectTasks.length > 0;
+                    const isExpanded = expandedProjects.has(project.id);
 
                     return (
-                      <div
-                        key={project.id}
-                        className={`flex border-b border-zinc-800 ${isEditing ? 'bg-zinc-800/30' : ''}`}
-                        style={{ height: ROW_H }}
-                      >
-                        {/* Name cell — sticky left */}
+                      <React.Fragment key={project.id}>
+                        {/* Project row */}
                         <div
-                          className={`sticky left-0 z-10 border-r border-zinc-700 flex items-center px-3 gap-2 flex-shrink-0 ${isEditing ? 'bg-zinc-800/60' : 'bg-zinc-900'}`}
-                          style={{ width: LEFT_W }}
+                          className={`flex border-b border-zinc-800 ${isEditing ? 'bg-zinc-800/30' : ''}`}
+                          style={{ height: ROW_H }}
                         >
+                          {/* Name cell — sticky left */}
                           <div
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: project.color }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-white text-sm font-medium truncate">{project.name}</div>
-                            <div className="text-zinc-500 text-xs truncate">{project.boardName}</div>
+                            className={`sticky left-0 z-10 border-r border-zinc-700 flex items-center px-3 gap-1.5 flex-shrink-0 ${isEditing ? 'bg-zinc-800/60' : 'bg-zinc-900'}`}
+                            style={{ width: LEFT_W }}
+                          >
+                            {/* Expand toggle — only shown when project has tasks */}
+                            {hasTasks ? (
+                              <button
+                                onClick={() => toggleExpand(project.id)}
+                                className="text-zinc-500 hover:text-zinc-300 flex-shrink-0 transition-colors p-0.5"
+                                title={isExpanded ? 'Collapse tasks' : 'Expand tasks'}
+                              >
+                                <ChevronRight
+                                  size={12}
+                                  className={`transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+                                />
+                              </button>
+                            ) : (
+                              <div className="w-4 flex-shrink-0" />
+                            )}
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: project.color }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white text-sm font-medium truncate">{project.name}</div>
+                              <div className="text-zinc-500 text-xs truncate">{project.boardName}</div>
+                            </div>
+                            <button
+                              onClick={() => openEdit(project)}
+                              className="text-zinc-600 hover:text-zinc-300 flex-shrink-0 transition-colors p-0.5"
+                              title="Edit dates"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleRemove(project.id)}
+                              className="text-zinc-600 hover:text-red-400 flex-shrink-0 transition-colors p-0.5"
+                              title="Remove from timeline"
+                            >
+                              <X size={12} />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => openEdit(project)}
-                            className="text-zinc-600 hover:text-zinc-300 flex-shrink-0 transition-colors p-0.5"
-                            title="Edit dates"
+
+                          {/* Bar area */}
+                          <div
+                            className="relative flex-shrink-0"
+                            style={{ width: totalW, height: ROW_H }}
                           >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            onClick={() => handleRemove(project.id)}
-                            className="text-zinc-600 hover:text-red-400 flex-shrink-0 transition-colors p-0.5"
-                            title="Remove from timeline"
-                          >
-                            <X size={12} />
-                          </button>
+                            {weeks.map((_, i) => (
+                              <div
+                                key={i}
+                                className="absolute top-0 bottom-0 border-r border-zinc-800/50"
+                                style={{ left: i * WEEK_W, width: WEEK_W }}
+                              />
+                            ))}
+                            {monthSections.map((m, i) =>
+                              i > 0 ? (
+                                <div
+                                  key={m.key}
+                                  className="absolute top-0 bottom-0 w-px bg-zinc-700 pointer-events-none"
+                                  style={{ left: m.left }}
+                                />
+                              ) : null
+                            )}
+                            {todayOffset >= 0 && (
+                              <div
+                                className="absolute top-0 bottom-0 w-[2px] bg-red-400/30 pointer-events-none z-10"
+                                style={{ left: todayOffset }}
+                              />
+                            )}
+                            {!isEditing && (
+                              <div
+                                className="absolute rounded cursor-pointer"
+                                style={{
+                                  left: barLeft,
+                                  width: barWidth,
+                                  top: '25%',
+                                  height: '50%',
+                                  backgroundColor: project.color,
+                                  boxShadow: `0 0 8px ${project.color}80, 0 0 16px ${project.color}40`,
+                                }}
+                                onMouseEnter={(e) =>
+                                  setTooltip({
+                                    text: `${fmtDate(project.start_date!)} → ${fmtDate(project.end_date!)}`,
+                                    x: e.clientX,
+                                    y: e.clientY - 36,
+                                  })
+                                }
+                                onMouseMove={(e) =>
+                                  setTooltip((prev) =>
+                                    prev ? { ...prev, x: e.clientX, y: e.clientY - 36 } : null
+                                  )
+                                }
+                                onMouseLeave={() => setTooltip(null)}
+                              />
+                            )}
+                          </div>
                         </div>
 
-                        {/* Bar area */}
-                        <div
-                          className="relative flex-shrink-0"
-                          style={{ width: totalW, height: ROW_H }}
-                        >
-                          {/* Week grid lines */}
-                          {weeks.map((_, i) => (
+                        {/* Task sub-rows — shown when expanded */}
+                        {hasTasks && isExpanded && projectTasks.map((task) => {
+                          const taskEditing = editingTaskId === task.id;
+                          const hasTaskDates = !!(task.start_date && task.end_date);
+                          const taskStartPx = hasTaskDates ? dayPixelOffset(task.start_date!, weeks) : 0;
+                          const taskEndPx = hasTaskDates ? dayPixelOffset(task.end_date!, weeks) + WEEK_W / 7 : 0;
+                          const taskBarLeft = taskStartPx + 2;
+                          const taskBarWidth = hasTaskDates ? Math.max(taskEndPx - taskStartPx - 4, WEEK_W / 7) : 0;
+
+                          return (
                             <div
-                              key={i}
-                              className="absolute top-0 bottom-0 border-r border-zinc-800/50"
-                              style={{ left: i * WEEK_W, width: WEEK_W }}
-                            />
-                          ))}
-                          {/* Month separator lines */}
-                          {monthSections.map((m, i) =>
-                            i > 0 ? (
+                              key={task.id}
+                              className={`flex border-b border-zinc-800/60 ${taskEditing ? 'bg-zinc-800/20' : ''}`}
+                              style={{ height: TASK_ROW_H }}
+                            >
+                              {/* Task name cell */}
                               <div
-                                key={m.key}
-                                className="absolute top-0 bottom-0 w-px bg-zinc-700 pointer-events-none"
-                                style={{ left: m.left }}
-                              />
-                            ) : null
-                          )}
-                          {/* Today line */}
-                          {todayOffset >= 0 && (
-                            <div
-                              className="absolute top-0 bottom-0 w-[2px] bg-red-400/30 pointer-events-none z-10"
-                              style={{ left: todayOffset }}
-                            />
-                          )}
-                          {/* Bar */}
-                          {!isEditing && (
-                            <div
-                              className="absolute rounded cursor-pointer"
-                              style={{
-                                left: barLeft,
-                                width: barWidth,
-                                top: '25%',
-                                height: '50%',
-                                backgroundColor: project.color,
-                                boxShadow: `0 0 8px ${project.color}80, 0 0 16px ${project.color}40`,
-                              }}
-                              onMouseEnter={(e) =>
-                                setTooltip({
-                                  text: `${fmtDate(project.start_date!)} → ${fmtDate(project.end_date!)}`,
-                                  x: e.clientX,
-                                  y: e.clientY - 36,
-                                })
-                              }
-                              onMouseMove={(e) =>
-                                setTooltip((prev) =>
-                                  prev ? { ...prev, x: e.clientX, y: e.clientY - 36 } : null
-                                )
-                              }
-                              onMouseLeave={() => setTooltip(null)}
-                            />
-                          )}
-                        </div>
-                      </div>
+                                className={`sticky left-0 z-10 border-r border-zinc-700/60 flex items-center pl-8 pr-3 gap-1.5 flex-shrink-0 ${taskEditing ? 'bg-zinc-800/40' : 'bg-zinc-900'}`}
+                                style={{ width: LEFT_W }}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-zinc-400 text-xs truncate">{task.description}</div>
+                                </div>
+                                {hasTaskDates ? (
+                                  <>
+                                    <button
+                                      onClick={() => openEditTask(task)}
+                                      className="text-zinc-600 hover:text-zinc-300 flex-shrink-0 transition-colors p-0.5"
+                                      title="Edit task dates"
+                                    >
+                                      <Pencil size={11} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveTask(task.id)}
+                                      className="text-zinc-600 hover:text-red-400 flex-shrink-0 transition-colors p-0.5"
+                                      title="Remove task from timeline"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => openEditTask(task)}
+                                    className="text-zinc-600 hover:text-zinc-300 flex-shrink-0 transition-colors p-0.5"
+                                    title="Add task dates"
+                                  >
+                                    <Plus size={11} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Task bar area */}
+                              <div
+                                className="relative flex-shrink-0"
+                                style={{ width: totalW, height: TASK_ROW_H }}
+                              >
+                                {weeks.map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className="absolute top-0 bottom-0 border-r border-zinc-800/30"
+                                    style={{ left: i * WEEK_W, width: WEEK_W }}
+                                  />
+                                ))}
+                                {monthSections.map((m, i) =>
+                                  i > 0 ? (
+                                    <div
+                                      key={m.key}
+                                      className="absolute top-0 bottom-0 w-px bg-zinc-700/50 pointer-events-none"
+                                      style={{ left: m.left }}
+                                    />
+                                  ) : null
+                                )}
+                                {todayOffset >= 0 && (
+                                  <div
+                                    className="absolute top-0 bottom-0 w-[2px] bg-red-400/20 pointer-events-none z-10"
+                                    style={{ left: todayOffset }}
+                                  />
+                                )}
+                                {hasTaskDates && !taskEditing && (
+                                  <div
+                                    className="absolute rounded cursor-pointer"
+                                    style={{
+                                      left: taskBarLeft,
+                                      width: taskBarWidth,
+                                      top: '20%',
+                                      height: '60%',
+                                      backgroundColor: project.color + 'AA',
+                                      boxShadow: `0 0 6px ${project.color}50`,
+                                    }}
+                                    onMouseEnter={(e) =>
+                                      setTooltip({
+                                        text: `${task.description}: ${fmtDate(task.start_date!)} → ${fmtDate(task.end_date!)}`,
+                                        x: e.clientX,
+                                        y: e.clientY - 36,
+                                      })
+                                    }
+                                    onMouseMove={(e) =>
+                                      setTooltip((prev) =>
+                                        prev ? { ...prev, x: e.clientX, y: e.clientY - 36 } : null
+                                      )
+                                    }
+                                    onMouseLeave={() => setTooltip(null)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -571,11 +805,15 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
           )}
         </div>
 
-        {/* Edit form — only shown when adding/editing */}
-        {editingId !== null && (
+        {/* Edit form — only shown when adding/editing a project or task */}
+        {isEditingAny && (
           <div className="flex-shrink-0 border-t border-zinc-800 px-4 py-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-center gap-3 flex-wrap">
-              {editingId === 'new' ? (
+              {editingTaskId !== null ? (
+                <span className="text-sm text-zinc-300 font-medium truncate max-w-[160px]">
+                  {editingTask?.description ?? 'Task'}
+                </span>
+              ) : editingId === 'new' ? (
                 <select
                   value={formProjectId}
                   onChange={(e) => setFormProjectId(e.target.value)}
