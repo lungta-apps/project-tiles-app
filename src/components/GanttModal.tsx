@@ -74,12 +74,17 @@ function isoWeekOf(d: Date): number {
   );
 }
 
+// Timeline spans 3 months back through 12 months ahead of the current month,
+// so it always covers "now" no matter when it's opened.
+const MONTHS_BEFORE = 3;
+const MONTHS_AFTER = 12;
+
 function buildWeeks(): WeekEntry[] {
   const now = new Date();
-  const may1 = new Date(now.getFullYear(), 4, 1);
-  const end = new Date(now.getFullYear() + 1, 4, 1);
+  const start = new Date(now.getFullYear(), now.getMonth() - MONTHS_BEFORE, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + MONTHS_AFTER + 1, 1);
   const weeks: WeekEntry[] = [];
-  const cur = firstMondayOnOrAfter(may1);
+  const cur = firstMondayOnOrAfter(start);
   while (cur < end) {
     weeks.push({
       isoWeek: isoWeekOf(cur),
@@ -244,6 +249,16 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
   const weeks = useMemo(() => buildWeeks(), []);
   const monthSections = useMemo(() => buildMonthSections(weeks), [weeks]);
   const totalW = weeks.length * WEEK_W;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // On open, scroll so the 1st of the current month sits at the left edge of the timeline
+  useEffect(() => {
+    if (!isOpen || loading || !scrollRef.current) return;
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    scrollRef.current.scrollLeft = dayPixelOffset(monthStart, weeks);
+  }, [isOpen, loading, weeks]);
 
   const todayMidnight = useMemo(() => {
     const d = new Date();
@@ -536,7 +551,7 @@ export default function GanttModal({ isOpen, onClose, boards, boardId }: GanttMo
               Loading...
             </div>
           ) : (
-            <div className="h-full overflow-auto" style={{ overscrollBehavior: 'contain' }}>
+            <div ref={scrollRef} className="h-full overflow-auto" style={{ overscrollBehavior: 'contain' }}>
               <div style={{ minWidth: LEFT_W + totalW }}>
 
                 {/* Month header — sticky top */}
